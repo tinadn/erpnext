@@ -43,7 +43,7 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {"Purchase Receipt" : "public/js/purchase_receipt.js"}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -83,8 +83,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "assets.install.before_install"
-# after_install = "assets.install.after_install"
-
+after_install = "assets.setup.after_install"
 # Uninstallation
 # ------------
 
@@ -129,9 +128,14 @@ app_license = "mit"
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Purchase Receipt": "assets.overrides.purchase_receipt.purchase_receipt.AssetsPurchaseReceipt",
+    "Material Request": "assets.overrides.material_request.material_request.AssetsMaterialRequest",
+    "Purchase Invoice": "assets.overrides.purchase_invoice.purchase_invoice.AssetsPurchaseInvoice",
+    "Purchase Order": "assets.overrides.purchase_order.purchase_order.AssetsPurchaseOrder",
+    "Request For Quotation": "assets.overrides.request_for_quotation.request_for_quotation.AssetsRequestForQuotation",
+    "Supplier Quotation": "assets.overrides.supplier_quotation.supplier_quotation.AssetsSupplierQuotation",
+}
 
 # Document Events
 # ---------------
@@ -161,7 +165,7 @@ doc_events = {
 		"on_cancel": "assets.assets.customizations.journal_entry.journal_entry.on_cancel",
 	},
     "Purchase Receipt": {
-        "validate": "assets.assets.customizations.purchase_receipt.purchase_receipt.validate",
+        "validate": "assets.overrides.purchase_receipt.purchase_receipt.validate",
 	},
 }
 
@@ -193,16 +197,16 @@ global_search_doctypes = {
 # Overriding Methods
 # ------------------------------
 #
-# override_whitelisted_methods = {
-# 	"frappe.desk.doctype.event.event.get_events": "assets.event.get_events"
-# }
+override_whitelisted_methods = {
+	"erpnext.stock.doctype.purchase_receipt.purchase_receipt.make_purchase_invoice": "assets.overrides.purchase_receipt.override.make_purchase_invoice"
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
-# override_doctype_dashboards = {
-# 	"Task": "assets.task.get_dashboard_data"
-# }
+override_doctype_dashboards = {
+	"Purchase Receipt": "assets.overrides.purchase_receipt.purchase_receipt_dashboard.get_data"
+}
 
 # exempt linked doctypes from being automatically cancelled
 #

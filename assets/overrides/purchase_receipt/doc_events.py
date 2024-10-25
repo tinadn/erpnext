@@ -1,8 +1,5 @@
 from assets.assets.doctype.asset.asset import get_asset_account, is_cwip_accounting_enabled
 
-def validate(doc, method = None):
-    validate_cwip_accounts(doc)
-
 def validate_cwip_accounts(doc):
     for item in doc.get("items"):
         if item.is_fixed_asset and is_cwip_accounting_enabled(item.asset_category):
