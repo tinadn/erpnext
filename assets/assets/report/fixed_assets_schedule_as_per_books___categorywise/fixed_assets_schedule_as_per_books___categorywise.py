@@ -73,7 +73,7 @@ def get_asset_categories_for_grouped_by_category(filters):
 		f"""
 		SELECT a.asset_category,
 			   ifnull(sum(case when a.purchase_date < %(from_date)s then
-							   case when ifnull(a.disposal_date, 0) = 0 or a.disposal_date >= %(from_date)s then
+							   case when ifnull(a.disposal_date, 'epoch'::date) = 'epoch'::date or a.disposal_date >= %(from_date)s then
 									a.gross_purchase_amount
 							   else
 									0
@@ -86,10 +86,10 @@ def get_asset_categories_for_grouped_by_category(filters):
 			   				   else
 			   				   		0
 			   				   end), 0) as cost_of_new_purchase,
-			   ifnull(sum(case when ifnull(a.disposal_date, 0) != 0
+			   ifnull(sum(case when ifnull(a.disposal_date, 'epoch'::date) != 'epoch'::date
 			   						and a.disposal_date >= %(from_date)s
 			   						and a.disposal_date <= %(to_date)s then
-							   case when a.status = "Sold" then
+							   case when a.status = 'Sold' then
 							   		a.gross_purchase_amount
 							   else
 							   		0
@@ -97,10 +97,10 @@ def get_asset_categories_for_grouped_by_category(filters):
 						   else
 								0
 						   end), 0) as cost_of_sold_asset,
-			   ifnull(sum(case when ifnull(a.disposal_date, 0) != 0
+			   ifnull(sum(case when ifnull(a.disposal_date, 'epoch'::date) != 'epoch'::date
 			   						and a.disposal_date >= %(from_date)s
 			   						and a.disposal_date <= %(to_date)s then
-							   case when a.status = "Scrapped" then
+							   case when a.status = 'Scrapped' then
 							   		a.gross_purchase_amount
 							   else
 							   		0
@@ -219,61 +219,62 @@ def get_group_by_asset_data(filters):
 	return aggregate_and_calculate_subtotals(data)
 
 def aggregate_and_calculate_subtotals(data):
-    # Adjust cost_of_sold_asset by adding cost_of_scrapped_asset
-    for entry in data:
-        entry['cost_of_sold_asset'] += entry['cost_of_scrapped_asset']
+	# Adjust cost_of_sold_asset by adding cost_of_scrapped_asset
+	for entry in data:
+		entry['cost_of_sold_asset'] += entry['cost_of_scrapped_asset']
 
-    # Aggregation based on asset_name and asset_category
-    aggregated_data = {}
-    for entry in data:
-        asset_name = entry['asset_name']
-        if asset_name not in aggregated_data:
-            aggregated_data[asset_name] = {
-                'asset_name': asset_name,
-                'asset_category': entry['asset_category'],
-                'cost_as_on_from_date': 0,
-                'cost_of_new_purchase': 0,
-                'cost_of_sold_asset': 0,
-                'cost_as_on_to_date': 0,
-                'accumulated_depreciation_as_on_from_date': 0,
-                'depreciation_eliminated_during_the_period': 0,
-                'depreciation_amount_during_the_period': 0,
-                'accumulated_depreciation_as_on_to_date': 0,
-                'net_asset_value_as_on_from_date': 0,
-                'net_asset_value_as_on_to_date': 0
-            }
-        for key in aggregated_data[asset_name]:
-            if key != 'asset_name' and key != 'asset_category':
-                aggregated_data[asset_name][key] += entry[key]
+	# Aggregation based on asset_name and asset_category
+	aggregated_data = {}
+	for entry in data:
+		asset_name = entry['asset_name']
+		if asset_name not in aggregated_data:
+			aggregated_data[asset_name] = {
+				'asset_name': asset_name,
+				'asset_category': entry['asset_category'],
+				'cost_as_on_from_date': 0,
+				'cost_of_new_purchase': 0,
+				'cost_of_sold_asset': 0,
+				'cost_as_on_to_date': 0,
+				'accumulated_depreciation_as_on_from_date': 0,
+				'depreciation_eliminated_during_the_period': 0,
+				'depreciation_amount_during_the_period': 0,
+				'accumulated_depreciation_as_on_to_date': 0,
+				'net_asset_value_as_on_from_date': 0,
+				'net_asset_value_as_on_to_date': 0
+			}
+		for key in aggregated_data[asset_name]:
+			if key != 'asset_name' and key != 'asset_category':
+				aggregated_data[asset_name][key] += entry[key]
 
-    # Convert aggregated data to a list and sort by asset_category
-    result_sorted = sorted(aggregated_data.values(), key=lambda x: x['asset_category'])
+	# Convert aggregated data to a list and sort by asset_category
+	result_sorted = sorted(aggregated_data.values(), key=lambda x: x['asset_category'])
 
-    final_list = []
-    subtotal = {key: 0 for key in result_sorted[0] if key != 'asset_name' and key != 'asset_category'}
-    last_category = ""
+	final_list = []
+	if result_sorted:
+		subtotal = {key: 0 for key in result_sorted[0] if key != 'asset_name' and key != 'asset_category'}
+		last_category = ""
 
-    for row in result_sorted:
-        if last_category != row["asset_category"]:
-            if last_category:  # Add subtotal for the previous category
-                final_list.append({"asset_name": "Sub-total", "asset_category": last_category, **subtotal})
+		for row in result_sorted:
+			if last_category != row["asset_category"]:
+				if last_category:  # Add subtotal for the previous category
+					final_list.append({"asset_name": "Sub-total", "asset_category": last_category, **subtotal})
 
-            # Reset subtotal for the new category
-            last_category = row["asset_category"]
-            subtotal = {key: 0 for key in subtotal}
-            final_list.append({"asset_name": row["asset_category"], "asset_category": row["asset_category"]})
+				# Reset subtotal for the new category
+				last_category = row["asset_category"]
+				subtotal = {key: 0 for key in subtotal}
+				final_list.append({"asset_name": row["asset_category"], "asset_category": row["asset_category"]})
 
-        # Accumulate subtotals for the current category
-        for key in subtotal:
-            subtotal[key] += row[key]
+			# Accumulate subtotals for the current category
+			for key in subtotal:
+				subtotal[key] += row[key]
 
-        final_list.append(row)
+			final_list.append(row)
 
-    # Add the final subtotal after the loop
-    if last_category:
-        final_list.append({"asset_name": "Sub-total", "asset_category": last_category, **subtotal})
+		# Add the final subtotal after the loop
+		if last_category:
+			final_list.append({"asset_name": "Sub-total", "asset_category": last_category, **subtotal})
 
-    return final_list
+	return final_list
 
 
 
@@ -288,19 +289,19 @@ def get_assets_for_grouped_by_category(filters):
 			   sum(results.depreciation_eliminated_during_the_period) as depreciation_eliminated_during_the_period,
 			   sum(results.depreciation_amount_during_the_period) as depreciation_amount_during_the_period
 		from (SELECT a.asset_category,a.name,
-				   ifnull(sum(case when gle.posting_date < %(from_date)s and (ifnull(a.disposal_date, 0) = 0 or a.disposal_date >= %(from_date)s) then
+				   ifnull(sum(case when gle.posting_date < %(from_date)s and (ifnull(a.disposal_date, 'epoch'::date) = 'epoch'::date or a.disposal_date >= %(from_date)s) then
 								   gle.debit
 							  else
 								   0
 							  end), 0) as accumulated_depreciation_as_on_from_date,
-				   ifnull(sum(case when ifnull(a.disposal_date, 0) != 0 and a.disposal_date >= %(from_date)s
+				   ifnull(sum(case when ifnull(a.disposal_date, 'epoch'::date) != 'epoch'::date and a.disposal_date >= %(from_date)s
 										and a.disposal_date <= %(to_date)s and gle.posting_date <= a.disposal_date then
 								   gle.debit
 							  else
 								   0
 							  end), 0) as depreciation_eliminated_during_the_period,
 				   ifnull(sum(case when gle.posting_date >= %(from_date)s and gle.posting_date <= %(to_date)s
-										and (ifnull(a.disposal_date, 0) = 0 or gle.posting_date <= a.disposal_date) then
+										and (ifnull(a.disposal_date, 'epoch'::date) = 'epoch'::date or gle.posting_date <= a.disposal_date) then
 								   gle.debit
 							  else
 								   0
@@ -313,10 +314,10 @@ def get_assets_for_grouped_by_category(filters):
 			join `tabCompany` company on
 				company.name = %(company)s
 			where a.docstatus=1 and gle.finance_book = %(finance_book)s and a.company=%(company)s and a.purchase_date <= %(to_date)s and gle.debit != 0 and gle.is_cancelled = 0 and gle.account = ifnull(aca.depreciation_expense_account, company.depreciation_expense_account) {0}
-			group by a.asset_category
+			group by a.asset_category, a.name
 			union
 			SELECT a.asset_category,a.name,
-				   ifnull(sum(case when ifnull(a.disposal_date, 0) != 0 and (a.disposal_date < %(from_date)s or a.disposal_date > %(to_date)s) then
+				   ifnull(sum(case when ifnull(a.disposal_date, 'epoch'::date) != 'epoch'::date and (a.disposal_date < %(from_date)s or a.disposal_date > %(to_date)s) then
 									0
 							   else
 									a.opening_accumulated_depreciation
@@ -329,8 +330,8 @@ def get_assets_for_grouped_by_category(filters):
 				   0 as depreciation_amount_during_the_period
 			from `tabAsset` a
 			where a.docstatus=1 and a.company=%(company)s and a.purchase_date <= %(to_date)s {0}
-			group by a.asset_category) as results
-		group by results.asset_category
+			group by a.asset_category, a.name) as results
+		group by results.asset_category, results.name
 		""".format(condition),
 		{
 		"finance_book":"Company Act","to_date": filters.to_date,
@@ -424,7 +425,7 @@ def get_columns(filters):
 					"fieldtype": "data",
 					"width": 120,
 			}
-                )
+				)
 
 	columns += [
 		 {
