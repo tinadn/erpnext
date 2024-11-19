@@ -30,15 +30,17 @@
   "column_break_hwsg",
   "parent_work_breakdown_structure",
   "wbs_level",
-  "amended_from"
+  "amended_from",
+  "lft",
+  "rgt",
+  "created_from_project"
  ],
  "fields": [
   {
    "fieldname": "project",
    "fieldtype": "Link",
    "label": "Project",
-   "options": "Project",
-   "reqd": 1
+   "options": "Project"
   },
   {
    "fieldname": "project_type",
@@ -49,8 +51,7 @@
    "fieldname": "wbs_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "WBS Name",
-   "reqd": 1
+   "label": "WBS Name"
   },
   {
    "allow_on_submit": 1,
@@ -69,8 +70,7 @@
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "Company",
-   "options": "Company",
-   "reqd": 1
+   "options": "Company"
   },
   {
    "fieldname": "column_break_bcho",
@@ -174,6 +174,7 @@
    "label": "WBS Level"
   },
   {
+   "depends_on": "eval:doc.is_group == 1",
    "fieldname": "gl_account",
    "fieldtype": "Link",
    "label": "GL Account",
@@ -194,12 +195,30 @@
    "label": "Linked Monthly Distribution",
    "options": "WBS Monthly Distribution",
    "read_only": 1
+  },
+  {
+   "fieldname": "lft",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Left"
+  },
+  {
+   "fieldname": "rgt",
+   "fieldtype": "Int",
+   "hidden": 1,
+   "label": "Right"
+  },
+  {
+   "default": "0",
+   "fieldname": "created_from_project",
+   "fieldtype": "Check",
+   "label": "Created From Project"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-11-12 10:17:09.878161",
+ "modified": "2024-11-19 15:31:03.916490",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Work Breakdown Structure",

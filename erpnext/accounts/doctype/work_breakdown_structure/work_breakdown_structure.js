@@ -135,15 +135,15 @@ function calculate_available_budget(frm) {
     frm.set_value("available_budget", available_budget);
 }
 
-function toggle_gl_account(frm) {
-    if (frm.doc.is_group) {
-        frm.set_df_property('gl_account', 'reqd', 0);
-        frm.set_df_property('gl_account', 'hidden', 1);
-        if (frm.doc.gl_account) {
-            frm.set_value('gl_account',null);
-        }
-    } else {
-        frm.set_df_property('gl_account', 'reqd', 1);
-        frm.set_df_property('gl_account', 'hidden', 0);
-    }
-}
+// function toggle_gl_account(frm) {
+//     if (frm.doc.is_group) {
+//         frm.set_df_property('gl_account', 'reqd', 0);
+//         frm.set_df_property('gl_account', 'hidden', 1);
+//         if (frm.doc.gl_account) {
+//             frm.set_value('gl_account',null);
+//         }
+//     } else {
+//         frm.set_df_property('gl_account', 'reqd', 1);
+//         frm.set_df_property('gl_account', 'hidden', 0);
+//     }
+// }

@@ -22,19 +22,22 @@ class WorkBreakdownStructure(Document):
 		assigned_overall_budget: DF.Currency
 		available_budget: DF.Currency
 		committed_overall_budget: DF.Currency
-		company: DF.Link
+		company: DF.Link | None
+		created_from_project: DF.Check
 		gl_account: DF.Link | None
 		is_group: DF.Check
+		lft: DF.Int
 		linked_monthly_distribution: DF.Link | None
 		locked: DF.Check
 		original_budget: DF.Currency
 		overall_budget: DF.Currency
 		parent_work_breakdown_structure: DF.Link | None
-		project: DF.Link
+		project: DF.Link | None
 		project_name: DF.Data | None
 		project_type: DF.Data | None
+		rgt: DF.Int
 		wbs_level: DF.Data | None
-		wbs_name: DF.Data
+		wbs_name: DF.Data | None
 	# end: auto-generated types
 
 @frappe.whitelist()

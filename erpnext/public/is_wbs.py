@@ -23,11 +23,10 @@ def on_update(doc, method):
             "wbs_level": 0, 
             "description": doc.get("description"),
             "status": "Active",
-            "is_group": 1 
+            "is_group": 1 ,
+            
         })
-
-        # if not data.wbs_level:
-        #     data.wbs_level = 1
+        
 
         try:
             data.insert(ignore_permissions=True)

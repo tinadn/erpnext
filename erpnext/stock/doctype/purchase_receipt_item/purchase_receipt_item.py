@@ -30,6 +30,7 @@ class PurchaseReceiptItem(Document):
 		brand: DF.Link | None
 		conversion_factor: DF.Float
 		cost_center: DF.Link | None
+		cost_center_name: DF.Data | None
 		delivery_note_item: DF.Data | None
 		description: DF.TextEditor | None
 		discount_amount: DF.Currency
@@ -62,7 +63,6 @@ class PurchaseReceiptItem(Document):
 		price_list_rate: DF.Currency
 		pricing_rules: DF.SmallText | None
 		product_bundle: DF.Link | None
-		project: DF.Link | None
 		project_name: DF.Data | None
 		provisional_expense_account: DF.Link | None
 		purchase_invoice: DF.Link | None
