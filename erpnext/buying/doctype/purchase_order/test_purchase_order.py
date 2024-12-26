@@ -1123,6 +1123,25 @@ class TestPurchaseOrder(FrappeTestCase):
 		po.reload()
 		self.assertEqual(po.per_billed, 100)
 
+	def test_create_purchase_receipt(self):
+		po = create_purchase_order(rate=10000,qty=10)
+		po.submit()
+
+		pr = create_pr_against_po(po.name, received_qty=10)
+		bin_qty = frappe.db.get_value("Bin", {"item_code": "_Test Item", "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty)
+		self.assertEqual(sle.warehouse, po.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 100000)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 100000)
 
 def prepare_data_for_internal_transfer():
 	from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_internal_supplier
