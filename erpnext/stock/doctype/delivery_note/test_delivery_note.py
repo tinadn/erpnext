@@ -2449,6 +2449,18 @@ class TestDeliveryNote(FrappeTestCase):
 		self.assertEqual(sle.get("actual_qty"),-10)
 		self.assertEqual(sle.get("warehouse"),"_Test Warehouse - _TC")
 
+	def test_delivery_note_cancel_TC_SCK_054(self):
+		dn = create_delivery_note(qty = 10, rate = 10000)
+		self.assertEqual(dn.status,"To Bill")
+		sle = frappe.get_doc("Stock Ledger Entry", {"voucher_type": "Delivery Note", "voucher_no": dn.name})
+		self.assertEqual(sle.get("actual_qty"),- 10)
+		self.assertEqual(sle.get("warehouse"),"_Test Warehouse - _TC")
+
+		dn.cancel()
+		self.assertEqual(dn.status,"Cancelled")
+		sle = frappe.get_doc("Stock Ledger Entry", {"voucher_type": "Delivery Note", "voucher_no": dn.name,"is_cancelled":1})
+		self.assertEqual(sle.get("actual_qty"), 10)
+
 def create_delivery_note(**args):
 	dn = frappe.new_doc("Delivery Note")
 	args = frappe._dict(args)
