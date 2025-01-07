@@ -1909,175 +1909,137 @@ class TestMaterialRequest(FrappeTestCase):
 			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr.name, 'account': 'Stock In Hand - _TC'},'credit')
 			self.assertEqual(gl_stock_debit, 1000)
 
-	def test_create_material_req_to_po_to_2pr_return_TC_SCK_035(self):
-		#batch item
-		batch_item_code = make_item(
-			"Test Batch No for Validation",
-			{"has_batch_no": 1, "batch_number_series": "BT-TSNFVAL-.#####", "create_new_batch": 1},
-		).name
-		mr = make_material_request(item_code=batch_item_code)
-		
-		#partially qty
-		po = make_purchase_order(mr.name)
-		po.supplier = "_Test Supplier"
-		po.get("items")[0].rate = 100
-		po.insert()
-		po.submit()
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": batch_item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		pr = make_purchase_receipt(po.name)
-		pr.get("items")[0].qty = 10
-		pr.insert()
-		pr.submit()
-		
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty + 10)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
-		self.assertEqual(gl_temp_credit, 1000)
-		
-		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
-		self.assertEqual(gl_stock_debit, 1000)
+	def test_mr_to_partial_pr_TC_B_023(self):
+		# MR => 1RFQ => 2SQ => 2PO => 1PR => 1PI
+		args = frappe._dict()
+		args['mr'] = [{
+			"company": "_Test Company",
+			"item_code": "Testing-31",
+			"warehouse": "Stores - _TC",
+			"qty": 20,
+			"rate": 100,
+		}]
+		args['sq'] = [10, 10]
+		total_po_qty = sum(args['sq'])
+		total_pi_qty = 0
 
-		from erpnext.controllers.sales_and_purchase_return import make_return_doc
-		return_pr = make_return_doc("Purchase Receipt", pr.name)
-		return_pr.items[0].qty = -5
-		return_pr.items[0].received_qty = -5
-		return_pr.submit()
+		doc_mr = make_material_request(**args['mr'][0])
+		doc_rfq = make_test_rfq(doc_mr.name, received_qty=args['mr'][0]["qty"])
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": batch_item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':return_pr.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr.name, 'account': 'Stock Received But Not Billed - _TC'},'debit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr.name, 'account': 'Stock In Hand - _TC'},'credit')
-			self.assertEqual(gl_stock_debit, 500)
+		for sq_qty in args['sq']:
+			doc_sq = make_test_sq(doc_rfq.name, rate=100, received_qty=sq_qty)
+			doc_po = make_test_po(doc_sq.name, type='Supplier Quotation', received_qty=sq_qty)
 
-		return_pr1 = make_return_doc("Purchase Receipt", pr.name)
-		return_pr.items[0].qty = -5
-		return_pr.items[0].received_qty = -5
-		return_pr1.submit()
+		doc_pr = make_test_pr(doc_po.name, received_qty=total_po_qty)
+		doc_pi = make_test_pi(doc_pr.name, received_qty=total_po_qty)
+		total_pi_qty += doc_pi.items[0].qty
+		self.assertEqual(doc_pi.docstatus, 1)
+		self.assertEqual(doc_mr.items[0].qty, total_pi_qty)
+		doc_mr.reload()
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": batch_item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':return_pr1.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'debit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		# if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr1.name, 'account': 'Stock In Hand - _TC'},'credit')
-			self.assertEqual(gl_stock_debit, 500)
+		self.assertEqual(doc_mr.status, "Received")
 
-	def test_create_material_req_to_2po_to_2pr_TC_SCK_040(self):
-		mr = make_material_request()
-		
-		#partially qty
-		po = make_purchase_order(mr.name)
-		po.supplier = "_Test Supplier"
-		po.get("items")[0].rate = 100
-		po.get("items")[0].qty = 5
-		po.insert()
-		po.submit()
+	def test_mr_to_partial_pi_TC_B_024(self):
+		# 2MR => 1RFQ => 1SQ => 1PO => 1PR => 1PI
+		args = frappe._dict()
+		args['mr'] = [
+			{
+				"company": "_Test Company",
+				"item_code": "Testing-31",
+				"warehouse": "Stores - _TC",
+				"qty": 10,
+				"rate": 100,
+			},
+			{
+				"company": "_Test Company",
+				"item_code": "Testing-31",
+				"warehouse": "Stores - _TC",
+				"qty": 15,
+				"rate": 100,
+			}
+		]
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": "_Test Item", "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		pr = make_purchase_receipt(po.name)
-		pr.insert()
-		pr.submit()
-		
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
-			self.assertEqual(gl_stock_debit, 500)
+		total_mr_qty = 0
+		rfq_name = None
+		for mr_dict in args['mr']:
+			doc_mr = make_material_request(**mr_dict)
+			self.assertEqual(doc_mr.docstatus, 1)
+			total_mr_qty += doc_mr.items[0].qty
 
-		#remaining qty
-		po = make_purchase_order(mr.name)
-		po.supplier = "_Test Supplier"
-		po.get("items")[0].rate = 100
-		po.get("items")[0].qty = 5
-		po.insert()
-		po.submit()
+			if not rfq_name:
+				doc_rfq = make_test_rfq(doc_mr.name)
+				rfq_name = doc_rfq.name
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": "_Test Item", "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		pr1 = make_purchase_receipt(po.name)
-		pr1.insert()
-		pr1.submit()
-		
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr1.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
-			self.assertEqual(gl_stock_debit, 500)
+		doc_sq = make_test_sq(rfq_name, 100)
+		self.assertEqual(doc_sq.docstatus, 1)
 
-		from erpnext.controllers.sales_and_purchase_return import make_return_doc
-		return_pr = make_return_doc("Purchase Receipt", pr.name)
-		return_pr.items[0].qty = -5
-		return_pr.items[0].received_qty = -5
-		return_pr.submit()
+		item_dict = {
+			"item_code": "Testing-31",
+			"warehouse": "Stores - _TC",
+			"qty": total_mr_qty,
+			"rate": 100,
+			"supplier_quotation": doc_sq.name
+		}
+		doc_po = make_test_po(doc_sq.name, type='Supplier Quotation', item_dict=item_dict)
+		self.assertEqual(doc_po.docstatus, 1)
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": "_Test Item", "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':return_pr.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr.name, 'account': 'Stock Received But Not Billed - _TC'},'debit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr.name, 'account': 'Stock In Hand - _TC'},'credit')
-			self.assertEqual(gl_stock_debit, 500)
+		doc_pr = make_test_pr(doc_po.name)
+		self.assertEqual(doc_pr.docstatus, 1)
 
-		return_pr1 = make_return_doc("Purchase Receipt", pr1.name)
-		return_pr1.items[0].qty = -5
-		return_pr1.items[0].received_qty = -5
-		return_pr1.submit()
+		doc_pi = make_test_pi(doc_pr.name)
+		self.assertEqual(doc_pi.docstatus, 1)
 
-		bin_qty = frappe.db.get_value("Bin", {"item_code": "_Test Item", "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
-		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':return_pr1.name})
-		self.assertEqual(sle.qty_after_transaction, bin_qty)
-		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
-		
-		#if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'debit')
-			self.assertEqual(gl_temp_credit, 500)
-		
-		# if account setup in company
-		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pr1.name, 'account': 'Stock In Hand - _TC'},'credit')
-			self.assertEqual(gl_stock_debit, 500)
+	def test_mr_to_partial_pi_TC_B_025(self):
+		# 2MR => 2RFQ => 1SQ => 1PO => 1PR => 1PI
+		args = frappe._dict()
+		args['mr'] = [
+			{
+				"company": "_Test Company",
+				"item_code": "Testing-31",
+				"warehouse": "Stores - _TC",
+				"qty": 10,
+				"rate": 100,
+			},
+			{
+				"company": "_Test Company",
+				"item_code": "Testing-31",
+				"warehouse": "Stores - _TC",
+				"qty": 15,
+				"rate": 100,
+			}
+		]
+
+		rfq_name_list = []
+		total_mr_qty = 0
+		for mr_dict in args['mr']:
+			doc_mr = make_material_request(**mr_dict)
+			self.assertEqual(doc_mr.docstatus, 1)
+			total_mr_qty += doc_mr.items[0].qty
+
+			doc_rfq = make_test_rfq(doc_mr.name)
+			self.assertEqual(doc_rfq.docstatus, 1)
+			rfq_name_list.append(doc_rfq.name)
+
+		doc_sq = make_test_sq(rfq_name_list, 100)
+		self.assertEqual(doc_sq.docstatus, 1)
+
+		item_dict = {
+			"item_code": "Testing-31",
+			"warehouse": "Stores - _TC",
+			"qty": total_mr_qty,
+			"rate": 100,
+			"supplier_quotation": doc_sq.name
+		}
+		doc_po = make_test_po(doc_sq.name, type='Supplier Quotation', item_dict=item_dict)
+		self.assertEqual(doc_po.docstatus, 1)
+
+		doc_pr = make_test_pr(doc_po.name)
+		self.assertEqual(doc_pr.docstatus, 1)
+
+		doc_pi = make_test_pi(doc_pr.name)
+		self.assertEqual(doc_pi.docstatus, 1)
+
 
 def get_in_transit_warehouse(company):
 	if not frappe.db.exists("Warehouse Type", "Transit"):
