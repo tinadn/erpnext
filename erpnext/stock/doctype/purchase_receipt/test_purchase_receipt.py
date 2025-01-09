@@ -3999,6 +3999,35 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(sl_entries[0]['actual_qty'], -10)
 		self.assertEqual(sh_gle[0], sh_gle[1])
 		self.assertEqual(srbnb_gle[0], srbnb_gle[1])
+	
+	def test_pr_with_additional_discount_TC_B_053(self):
+		# Scenario : PR => PI [With Additional Discount]
+		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import (
+			make_purchase_invoice as make_pi_from_pr,
+		)
+				
+		pr_data = {
+			"company" : "_Test Company",
+			"item_code" : "_Test Item",
+			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
+			"qty" : 1,
+			"rate" : 10000,
+			"apply_discount_on" : "Net Total",
+			"additional_discount_percentage" :10 ,
+		}
+
+		doc_pr = make_purchase_receipt(**pr_data)
+		self.assertEqual(doc_pr.discount_amount, 1000)
+		self.assertEqual(doc_pr.grand_total, 9000)
+
+		pi = make_pi_from_pr(doc_pr.name)
+		pi.insert()
+		pi.submit()
+
+		self.assertEqual(pi.discount_amount, 1000)
+		self.assertEqual(pi.grand_total, 9000)
 
 def prepare_data_for_internal_transfer():
 	from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_internal_supplier
@@ -4171,6 +4200,8 @@ def make_purchase_receipt(**args):
 	qty = args.qty or 5
 	rejected_qty = args.rejected_qty or 0
 	received_qty = args.received_qty or flt(rejected_qty) + flt(qty)
+	pr.apply_discount_on = args.apply_discount_on or None	
+	pr.additional_discount_percentage = args.additional_discount_percentage or None			
 
 	item_code = args.item or args.item_code or "_Test Item"
 	uom = args.uom or frappe.db.get_value("Item", item_code, "stock_uom") or "_Test UOM"

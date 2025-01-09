@@ -2143,6 +2143,59 @@ class TestPurchaseOrder(FrappeTestCase):
 		self.assertEqual(pr_item.rate, 117) 
 		self.assertEqual(pr_item.amount, 117)
 
+	def test_po_additional_discount_TC_B_052(self):
+		# Scenario : PO => PR => PI [With Additional Discount]
+				
+		po_data = {
+			"company" : "_Test Company",
+			"item_code" : "_Test Item",
+			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
+			"qty" : 1,
+			"rate" : 10000,
+			"apply_discount_on" : "Net Total",
+			"additional_discount_percentage" :10 ,
+		}
+
+		doc_po = create_purchase_order(**po_data)
+		
+		self.assertEqual(doc_po.discount_amount, 1000)
+		self.assertEqual(doc_po.grand_total, 9000)
+
+
+		doc_pr = make_pr_for_po(doc_po.name)
+		doc_pi = make_pi_against_pr(doc_pr.name)
+
+		self.assertEqual(doc_pi.discount_amount, 1000)
+		self.assertEqual(doc_pi.grand_total, 9000)
+
+	def test_po_additional_discount_TC_B_055(self):
+		# Scenario : PO => PI [With Additional Discount]
+				
+		po_data = {
+			"company" : "_Test Company",
+			"item_code" : "_Test Item",
+			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
+			"qty" : 1,
+			"rate" : 10000,
+			"apply_discount_on" : "Net Total",
+			"additional_discount_percentage" :10 ,
+		}
+
+		doc_po = create_purchase_order(**po_data)
+		
+		self.assertEqual(doc_po.discount_amount, 1000)
+		self.assertEqual(doc_po.grand_total, 9000)
+
+		doc_pi = make_pi_from_po(doc_po.name)
+		doc_pi.insert()
+		doc_pi.submit()
+		self.assertEqual(doc_pi.discount_amount, 1000)
+		self.assertEqual(doc_pi.grand_total, 9000)
+
 
 def create_po_for_sc_testing():
 	from erpnext.controllers.tests.test_subcontracting_controller import (
@@ -2273,6 +2326,9 @@ def create_purchase_order(**args):
 	po.currency = args.currency or frappe.get_cached_value("Company", po.company, "default_currency")
 	po.conversion_factor = args.conversion_factor or 1
 	po.supplier_warehouse = args.supplier_warehouse or None
+	po.apply_discount_on = args.apply_discount_on or None
+	po.additional_discount_percentage = args.additional_discount_percentage or None
+	po.discount_amount = args.discount_amount or None
 
 	if args.rm_items:
 		for row in args.rm_items:

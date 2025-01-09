@@ -3177,6 +3177,27 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		pi_status = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status, "Paid")
 
+
+	def test_pi_with_additional_discount_TC_B_054(self):
+		# Scenario : PI [With Additional Discount][StandAlone]	
+		pr_data = {
+			"company" : "_Test Company",
+			"item_code" : "_Test Item",
+			"warehouse" : "Stores - _TC",
+			"supplier": "_Test Supplier",
+            "schedule_date": "2025-01-13",
+			"qty" : 1,
+			"rate" : 10000,
+			"apply_discount_on" : "Net Total",
+			"additional_discount_percentage" :10 ,
+		}
+
+		doc_pi = make_purchase_receipt(**pr_data)
+		self.assertEqual(doc_pi.discount_amount, 1000)
+		self.assertEqual(doc_pi.grand_total, 9000)
+
+
+
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
 		"Company",
@@ -3280,6 +3301,8 @@ def make_purchase_invoice(**args):
 	pi.is_subcontracted = args.is_subcontracted or 0
 	pi.supplier_warehouse = args.supplier_warehouse or "_Test Warehouse 1 - _TC"
 	pi.cost_center = args.parent_cost_center
+	pi.apply_discount_on = args.apply_discount_on or None
+	pi.additional_discount_percentage = args.additional_discount_percentage or None
 
 	bundle_id = None
 	if not args.use_serial_batch_fields and (args.get("batch_no") or args.get("serial_no")):
