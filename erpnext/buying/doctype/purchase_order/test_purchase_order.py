@@ -1781,6 +1781,8 @@ class TestPurchaseOrder(FrappeTestCase):
 
 		}
 		
+		rule = frappe.get_doc(pricing_rule_record)
+		rule.insert()
 		doc_po = create_purchase_order(**po_data)
 		po_item = doc_po.items[0]
 		self.assertEqual(po_item.discount_percentage, 10)
