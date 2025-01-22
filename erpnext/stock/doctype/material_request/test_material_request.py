@@ -2911,6 +2911,128 @@ class TestMaterialRequest(FrappeTestCase):
 		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
 		self.assertEqual(sle.qty_after_transaction, 0)
 
+	def test_create_material_req_to_2po_to_pi_TC_SCK_095(self):
+		item_code = "Noise Smart watch"
+		warehouse = "Stock In Hand - _TC"
+		qty = 10
+		rate = 100
+
+		# Create Material Request
+		mr = make_material_request(
+			item_code=item_code,
+			qty=qty,
+			warehouse=warehouse,
+			material_request_type="Purchase"
+		)
+		self.assertEqual(mr.docstatus, 1)
+
+		# Create Purchase Order Case-1
+		po1 = make_purchase_order(mr.name)
+		po1.supplier = "_Test Supplier"
+		po1.transaction_date = "2025-08-02"
+		po1.schedule_date = "2025-08-10"
+		po1.items[0].qty = 5
+		po1.items[0].rate = rate
+		po1.insert()
+		po1.submit()
+		self.assertEqual(po1.docstatus, 1)
+
+		# Create Purchase Order Case-2
+		po2 = make_purchase_order(mr.name)
+		po2.supplier = "_Test Supplier"
+		po2.transaction_date = "2025-08-03"
+		po2.schedule_date = "2025-08-10"
+		po2.items[0].qty = 5
+		po2.items[0].rate = rate
+		po2.insert()
+		po2.submit()
+		self.assertEqual(po2.docstatus, 1)
+
+		# Create Purchase Invoice
+		pi = make_purchase_invoice(po1.name)
+		pi = make_purchase_invoice(po2.name, target_doc=pi)
+		pi.update_stock = 1
+		pi.insert()
+		pi.submit()
+		self.assertEqual(pi.docstatus, 1)
+
+		# Verify Stock Ledger
+		sle_entries = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": pi.name})
+		self.assertEqual(len(sle_entries), 2)
+
+		# Verify Accounting Ledger
+		gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": pi.name})
+		stock_in_hand_debit = sum([gle.debit for gle in gl_entries if gle.account == "Stock In Hand - _TC"])
+		creditors_credit = sum([gle.credit for gle in gl_entries if gle.account == "Creditors - _TC"])
+		self.assertEqual(stock_in_hand_debit, 1000)
+		self.assertEqual(creditors_credit, 1000)
+
+	def test_create_material_req_to_po_to_pi_TC_SCK_096(self):
+		company = "PP Ltd"
+		item_code = "Noise Smart watch"
+		target_warehouse = "Department Store - PP Ltd"
+		qty = 2
+		rate = 10000
+		posting_date = "2024-08-01"
+		required_by_date = "2024-08-15"
+
+		# Create Material Request
+		mr = make_material_request(
+			company=company,
+			item_code=item_code,
+			qty=qty,
+			warehouse=target_warehouse,
+			material_request_type="Purchase",
+			schedule_date=required_by_date
+		)
+		self.assertEqual(mr.docstatus, 1)
+
+		# Create Purchase Order
+		po = make_purchase_order(mr.name)
+		po.supplier = "_Test Supplier"
+		po.transaction_date = posting_date
+		po.schedule_date = required_by_date
+		po.items[0].qty = qty
+		po.items[0].rate = rate
+		po.insert()
+		po.submit()
+		self.assertEqual(po.docstatus, 1)
+
+		# Create Purchase Invoice
+		pi = make_purchase_invoice(po.name)
+		pi.update_stock = 1
+		pi.items[0].serial_no = "SN-001\nSN-002"
+		pi.insert()
+		pi.submit()
+		self.assertEqual(pi.docstatus, 1)
+
+		# Verify Stock Ledger
+		sle_entries = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": pi.name})
+		self.assertEqual(len(sle_entries), 1)
+		sle = frappe.get_doc("Stock Ledger Entry", sle_entries[0].name)
+		self.assertEqual(sle.actual_qty, qty)
+		self.assertEqual(sle.valuation_rate, rate)
+		self.assertEqual(sle.warehouse, target_warehouse)
+		self.assertEqual(sle.posting_date, posting_date)
+
+		# Verify Serial No
+		serial_nos = frappe.get_all("Serial No", filters={"item_code": item_code, "warehouse": target_warehouse})
+		self.assertEqual(len(serial_nos), qty)
+		for serial_no in serial_nos:
+			self.assertIn(serial_no.name, ["SN-001", "SN-002"])
+
+		# Cancel Purchase Invoice
+		pi.cancel()
+		self.assertEqual(pi.docstatus, 2)
+
+		# Verify Stock Ledger after cancellation
+		sle_entries = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": pi.name})
+		self.assertEqual(len(sle_entries), 0)
+
+		# Verify Serial No after cancellation
+		serial_nos = frappe.get_all("Serial No", filters={"item_code": item_code, "warehouse": target_warehouse})
+		self.assertEqual(len(serial_nos), 0)
+		
 def get_in_transit_warehouse(company):
 	if not frappe.db.exists("Warehouse Type", "Transit"):
 		frappe.get_doc(
