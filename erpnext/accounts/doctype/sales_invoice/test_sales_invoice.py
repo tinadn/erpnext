@@ -40,7 +40,7 @@ from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import
 )
 from erpnext.stock.utils import get_incoming_rate, get_stock_balance
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-
+from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_inter_company_purchase_invoice
 
 class TestSalesInvoice(FrappeTestCase):
 	def setUp(self):
@@ -6356,3 +6356,151 @@ def create_address(**args):
 		address.save()
 		frappe.db.commit()
 		return address
+
+def create_company_and_supplier():
+	parent_company= "Test Company-1122"
+	child_company = "Test Company-3344"
+	price_list = "Test Inter Company Transfer"
+	supplier = "Test Company-1122"
+	customer = "Test Company-3344"
+
+	if not frappe.db.exists("Company", parent_company):
+		frappe.get_doc(
+			{
+				"doctype": "Company",
+				"company_name": parent_company,
+				"abbr": "TC-1",
+				"default_currency": "INR",
+				"is_group": 1,
+				"gstin": "27AAAAP0267H2ZN",
+				"gst_category": "Registered Regular"
+			}
+		).insert()
+
+	if not frappe.db.exists("Company", child_company):
+		frappe.get_doc(
+			{
+				"doctype": "Company",
+				"company_name": child_company,
+				"abbr": "TC-3",
+				"default_currency": "INR",
+				"gstin": "27AABCT1296R1ZN",
+				"gst_category": "Registered Regular",
+				"parent_company": parent_company
+			}
+		).insert()
+
+	if not frappe.db.exists("Price List", price_list):
+		frappe.get_doc(
+			{
+				"doctype": "Price List",
+				"price_list_name": price_list,
+				"currency": "INR",
+				"buying": 1,
+				"selling": 1,
+				"countries": [
+					{
+						"country": "India"
+					}
+				]
+			}
+		).insert()
+
+	if not frappe.db.exists("Supplier", supplier):
+		frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": parent_company,
+				"supplier_type": "Individual",
+				"country": "India",
+				"default_price_list": price_list,
+				"is_internal_supplier": 1,
+				"represents_company": parent_company,
+				"companies": [
+					{
+						"company": child_company
+					}
+				]
+			}
+		).insert()
+
+		frappe.get_doc(
+			{
+				"doctype":"Address",
+				"address_title": parent_company,
+				"address_type": "Billing",
+				"address_line1": "GP Parsik Sahakari Bank, Second Floor",
+				"address_line2": "Sahkarmurti Gopinath Shivram Patil Bhavan MBT Road",
+				"city": "Thane",
+				"state": "Maharashtra",
+				"country": "India",
+				"pincode": "400605",
+				"gstin": "27AAAAP0267H2ZN",
+				"gst_category": "Registered Regular",
+				"is_your_company_address": 1,
+				"links": [
+					{
+						"link_doctype": "Company",
+						"link_name": parent_company
+					},
+					{
+						"link_doctype": "Supplier",
+						"link_name": supplier
+					}
+				]
+			}
+		).insert()
+
+	if not frappe.db.exists("Customer", customer):
+		frappe.get_doc(
+			{
+				"doctype": "Customer",
+				"customer_name": child_company,
+				"customer_type": "Company",
+				"country": "India",
+				"default_price_list": price_list,
+				"is_internal_customer": 1,
+				"represents_company": child_company,
+				"companies": [
+					{
+						"company": parent_company
+					}
+				]
+			}
+		).insert()
+
+		frappe.get_doc(
+			{
+				"doctype":"Address",
+				"address_title": child_company,
+				"address_type": "Billing",
+				"address_line1": "M1, 5, Empire Plaza Building A",
+				"address_line2": "L B S Road, Off. Village Hariyali, Vikhroli West",
+				"city": "Mumbai",
+				"state": "Maharashtra",
+				"country": "India",
+				"pincode": "400083",
+				"gstin": "27AABCT1296R1ZN",
+				"gst_category": "Registered Regular",
+				"is_your_company_address": 1,
+				"links": [
+					{
+						"link_doctype": "Company",
+						"link_name": child_company
+					},
+					{
+						"link_doctype": "Customer",
+						"link_name": customer
+					}
+				]
+			}
+		).insert()
+	frappe.db.commit()
+
+	return {
+		"parent_company": parent_company,
+		"child_company": child_company,
+		"supplier": supplier,
+		"customer": customer,
+		"price_list": price_list
+	}
