@@ -67,6 +67,7 @@
   "reports_tab",
   "remarks_section",
   "general_ledger_remarks_length",
+  "ignore_is_opening_check_for_reporting",
   "column_break_lvjk",
   "receivable_payable_remarks_length",
   "payment_request_settings",
@@ -452,6 +453,13 @@
    "fieldname": "payment_request_settings",
    "fieldtype": "Tab Break",
    "label": "Payment Request"
+  },
+  {
+   "default": "0",
+   "description": "Ignores legacy Is Opening field in GL Entry that allows adding opening balance post the system is in use while generating reports",
+   "fieldname": "ignore_is_opening_check_for_reporting",
+   "fieldtype": "Check",
+   "label": "Ignore Is Opening check for reporting"
   },
   {
    "default": "1",

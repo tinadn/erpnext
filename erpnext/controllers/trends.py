@@ -203,13 +203,13 @@ def get_data(filters, conditions):
 					(filters.get("company"), year_start_date, year_end_date, row[i][0], data1[d][0]),
 					as_list=1,
 				)
+				if row1:
+					des[ind] = row[i][0]
 
-				des[ind] = row[i][0]
+					for j in range(1, len(conditions["columns"]) - inc):
+						des[j + inc] = row1[0][j]
 
-				for j in range(1, len(conditions["columns"]) - inc):
-					des[j + inc] = row1[0][j]
-
-				data.append(des)
+					data.append(des)
 	else:
 		data = frappe.db.sql(
 			"""

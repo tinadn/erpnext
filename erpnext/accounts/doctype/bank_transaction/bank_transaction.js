@@ -19,6 +19,10 @@ frappe.ui.form.on("Bank Transaction", {
 			});
 		}
 	},
+	before_cancel(frm) {
+	    frm.call("remove_payment_entries").then(() => frm.refresh());
+	},
+
 	bank_account: function (frm) {
 		set_bank_statement_filter(frm);
 	},

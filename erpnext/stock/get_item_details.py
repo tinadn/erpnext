@@ -5,7 +5,6 @@
 import json
 
 import frappe
-from dateutil import parser
 from frappe import _, throw
 from frappe.model import child_table_fields, default_fields
 from frappe.model.meta import get_field_precision
@@ -116,6 +115,13 @@ def get_item_details(args, doc=None, for_validate=False, overwrite_warehouse=Tru
 
 	out.update(data)
 
+	if (
+		frappe.db.get_single_value("Stock Settings", "auto_create_serial_and_batch_bundle_for_outward")
+		and not args.get("serial_and_batch_bundle")
+		and (args.get("use_serial_batch_fields") or args.get("doctype") == "POS Invoice")
+	):
+		update_stock(args, out, doc)
+	
 	if args.transaction_date and item.lead_time_days:
 		out.schedule_date = out.lead_time_date = add_days(args.transaction_date, item.lead_time_days)
 
@@ -167,6 +173,92 @@ def update_bin_details(args, out, doc):
 		bin_details = get_bin_details(args.item_code, out.warehouse, company, include_child_warehouses=True)
 
 		out.update(bin_details)
+
+
+def update_stock(ctx, out, doc=None):
+	from erpnext.stock.doctype.batch.batch import get_available_batches
+	from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos_for_outward
+
+	if (
+		(
+			ctx.get("doctype") in ["Delivery Note", "POS Invoice"]
+			or (ctx.get("doctype") == "Sales Invoice" and ctx.get("update_stock"))
+		)
+		and out.warehouse
+		and out.stock_qty > 0
+	):
+		kwargs = frappe._dict(
+			{
+				"item_code": ctx.item_code,
+				"warehouse": ctx.warehouse,
+				"based_on": frappe.db.get_single_value("Stock Settings", "pick_serial_and_batch_based_on"),
+			}
+		)
+
+		if ctx.get("ignore_serial_nos"):
+			kwargs["ignore_serial_nos"] = ctx.get("ignore_serial_nos")
+
+		qty = out.stock_qty
+		batches = []
+		if out.has_batch_no and not ctx.get("batch_no"):
+			batches = get_available_batches(kwargs)
+			if doc:
+				filter_batches(batches, doc)
+
+			for batch_no, batch_qty in batches.items():
+				if batch_qty >= qty:
+					out.update({"batch_no": batch_no, "actual_batch_qty": qty})
+					break
+				else:
+					qty -= batch_qty
+
+				out.update({"batch_no": batch_no, "actual_batch_qty": batch_qty})
+
+		if out.has_serial_no and out.has_batch_no and has_incorrect_serial_nos(ctx, out):
+			kwargs["batches"] = [ctx.get("batch_no")] if ctx.get("batch_no") else [out.get("batch_no")]
+			serial_nos = get_serial_nos_for_outward(kwargs)
+			serial_nos = get_filtered_serial_nos(serial_nos, doc)
+
+			out["serial_no"] = "\n".join(serial_nos[: cint(out.stock_qty)])
+
+		elif out.has_serial_no and not ctx.get("serial_no"):
+			serial_nos = get_serial_nos_for_outward(kwargs)
+			serial_nos = get_filtered_serial_nos(serial_nos, doc)
+
+			out["serial_no"] = "\n".join(serial_nos[: cint(out.stock_qty)])
+
+
+def has_incorrect_serial_nos(ctx, out):
+	from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos
+
+	if not ctx.get("serial_no"):
+		return True
+
+	serial_nos = get_serial_nos(ctx.get("serial_no"))
+	if len(serial_nos) != out.get("stock_qty"):
+		return True
+
+	return False
+
+
+def filter_batches(batches, doc):
+	for row in doc.get("items"):
+		if row.get("batch_no") in batches:
+			batches[row.get("batch_no")] -= row.get("qty")
+			if batches[row.get("batch_no")] <= 0:
+				del batches[row.get("batch_no")]
+
+
+def get_filtered_serial_nos(serial_nos, doc):
+	from erpnext.stock.doctype.serial_no.serial_no import get_serial_nos
+
+	for row in doc.get("items"):
+		if row.get("serial_no"):
+			for serial_no in get_serial_nos(row.get("serial_no")):
+				if serial_no in serial_nos:
+					serial_nos.remove(serial_no)
+
+	return serial_nos
 
 
 def process_args(args):
@@ -294,9 +386,8 @@ def get_basic_details(args, item, overwrite_warehouse=True):
 
 	expense_account = None
 
-	#Check if assets app is installed
-	if "assets" in frappe.get_installed_apps() and args.get("doctype") == "Purchase Invoice" and item.get("is_fixed_asset"):
-		from assets.assets.doctype.asset_category.asset_category import get_asset_category_account
+	if args.get("doctype") == "Purchase Invoice" and item.is_fixed_asset:
+		from erpnext.assets.doctype.asset_category.asset_category import get_asset_category_account
 
 		expense_account = get_asset_category_account(
 			fieldname="fixed_asset_account", item=args.item_code, company=args.company
@@ -362,6 +453,7 @@ def get_basic_details(args, item, overwrite_warehouse=True):
 			"delivered_by_supplier": item.delivered_by_supplier
 			if args.get("doctype") in ["Sales Order", "Sales Invoice"]
 			else 0,
+			"is_fixed_asset": item.is_fixed_asset,
 			"last_purchase_rate": item.last_purchase_rate if args.get("doctype") in ["Purchase Order"] else 0,
 			"transaction_date": args.get("transaction_date"),
 			"against_blanket_order": args.get("against_blanket_order"),
@@ -371,10 +463,6 @@ def get_basic_details(args, item, overwrite_warehouse=True):
 			"grant_commission": item.get("grant_commission"),
 		}
 	)
-
-	#check if is_fixed_asset is present
-	if item.meta.get_field("is_fixed_asset"):
-		out["is_fixed_asset"] = item.is_fixed_asset
 
 	default_supplier = get_default_supplier(args, item_defaults, item_group_defaults, brand_defaults)
 	if default_supplier:
@@ -597,6 +685,7 @@ def _get_item_tax_template(args, taxes, out=None, for_validate=False):
 			if tax.valid_from or tax.maximum_net_rate:
 				# In purchase Invoice first preference will be given to supplier invoice date
 				# if supplier date is not present then posting date
+
 				validation_date = (
 					args.get("bill_date") or args.get("posting_date") or args.get("transaction_date")
 				)
@@ -814,7 +903,6 @@ def get_price_list_rate(args, item_doc, out=None):
 		if price_list_rate is None or frappe.db.get_single_value(
 			"Stock Settings", "update_existing_price_list_rate"
 		):
-
 			insert_item_price(args)
 
 		if price_list_rate is None:
@@ -846,7 +934,7 @@ def insert_item_price(args):
 		or args.get("is_internal_customer")
 	):
 		return
-	
+
 	if frappe.db.get_value("Price List", args.price_list, "currency", cache=True) == args.currency and cint(
 		frappe.db.get_single_value("Stock Settings", "auto_insert_price_list_rate_if_missing")
 	):
@@ -934,10 +1022,9 @@ def get_item_price(args, item_code, ignore_party=False, force_batch_no=False) ->
 			query = query.where((IfNull(ip.customer, "") == "") & (IfNull(ip.supplier, "") == ""))
 
 	if args.get("transaction_date"):
-		transaction_date = parser.parse(str(args["transaction_date"]))
 		query = query.where(
-			(IfNull(ip.valid_from, "2000-01-01") <= transaction_date)
-			& (IfNull(ip.valid_upto, "2500-12-31") >= transaction_date)
+			(IfNull(ip.valid_from, "2000-01-01") <= args["transaction_date"])
+			& (IfNull(ip.valid_upto, "2500-12-31") >= args["transaction_date"])
 		)
 
 	return query.run()
@@ -947,11 +1034,15 @@ def get_item_price(args, item_code, ignore_party=False, force_batch_no=False) ->
 def get_batch_based_item_price(params, item_code) -> float:
 	if isinstance(params, str):
 		params = parse_json(params)
+
 	item_price = get_item_price(params, item_code, force_batch_no=True)
+
 	if not item_price:
 		item_price = get_item_price(params, item_code, ignore_party=True, force_batch_no=True)
+
 	if item_price and item_price[0][2] == params.get("uom"):
 		return item_price[0][1]
+
 	return 0.0
 
 

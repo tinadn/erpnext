@@ -163,7 +163,7 @@ def item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=Fals
 		for field in [searchfield or "name", "item_code", "item_group", "item_name"]
 		if field not in searchfields
 	]
-	searchfields = " or ".join([field + " ilike %(txt)s" for field in searchfields])
+	searchfields = " or ".join([f"LOWER({field}) LIKE LOWER(%(txt)s)" for field in searchfields])
 
 	if filters and isinstance(filters, dict):
 		if filters.get("customer") or filters.get("supplier"):
@@ -197,7 +197,7 @@ def item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=Fals
 	description_cond = ""
 	if frappe.db.count(doctype, cache=True) < 50000:
 		# scan description only if items are less than 50000
-		description_cond = "or `tabItem`.description ILIKE %(txt)s"
+		description_cond = "or LOWER(`tabItem`.description) LIKE LOWER(%(txt)s)"
 	return frappe.db.sql(
 		"""select
 			`tabItem`.name {columns}
@@ -210,9 +210,9 @@ def item_query(doctype, txt, searchfield, start, page_len, filters, as_dict=Fals
 				{description_cond})
 			{fcond} {mcond}
 		order by
-			(case when locate(%(_txt)s, name) > 0 then locate(%(_txt)s, name) else 99999 end),
-			(case when locate(%(_txt)s, item_name) > 0 then locate(%(_txt)s, item_name) else 99999 end),
-			idx desc,
+            (case when locate(LOWER(%(_txt)s), LOWER(name)) > 0 then locate(LOWER(%(_txt)s), LOWER(name)) else 99999 end),
+            (case when locate(LOWER(%(_txt)s), LOWER(item_name)) > 0 then locate(LOWER(%(_txt)s), LOWER(item_name)) else 99999 end),
+            idx desc,
 			name, item_name
 		limit %(page_len)s offset %(start)s""".format(
 			columns=columns,

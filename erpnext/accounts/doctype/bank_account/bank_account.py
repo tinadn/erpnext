@@ -37,6 +37,7 @@ class BankAccount(Document):
 		last_integration_date: DF.Date | None
 		mask: DF.Data | None
 		opening_balance_as_per_bank_statement: DF.Currency
+		opening_balance_date: DF.Date | None
 		party: DF.DynamicLink | None
 		party_type: DF.Link | None
 	# end: auto-generated types

@@ -113,7 +113,7 @@ def validate_returned_items(doc):
 	for d in doc.get("items"):
 		key = d.item_code
 		raise_exception = False
-		if doc.doctype in ["Purchase Receipt", "Purchase Invoice", "Sales Invoice"]:
+		if doc.doctype in ["Purchase Receipt", "Purchase Invoice", "Sales Invoice", "POS Invoice"]:
 			field = frappe.scrub(doc.doctype) + "_item"
 			if d.get(field):
 				key = (d.item_code, d.get(field))
@@ -263,7 +263,7 @@ def get_already_returned_items(doc):
 
 	data = frappe.db.sql(
 		f"""
-		select {column}, {field}
+		select {column}, child.{field}
 		from
 			`tab{doc.doctype} Item` child, `tab{doc.doctype}` par
 		where
@@ -1024,7 +1024,7 @@ def get_serial_and_batch_bundle(field, doctype, reference_ids, is_rejected=False
 
 def filter_serial_batches(parent_doc, data, row, warehouse_field=None, qty_field=None):
 	if not qty_field:
-		qty_field = "qty"
+		qty_field = "stock_qty"
 
 	if not warehouse_field:
 		warehouse_field = "warehouse"
@@ -1113,7 +1113,7 @@ def make_serial_batch_bundle_for_return(data, child_doc, parent_doc, warehouse_f
 		warehouse_field = "warehouse"
 
 	if not qty_field:
-		qty_field = "qty"
+		qty_field = "stock_qty"
 
 	warehouse = child_doc.get(warehouse_field)
 	if parent_doc.get("is_internal_customer"):

@@ -1323,6 +1323,112 @@ class TestJournalEntry(unittest.TestCase):
 		]
 
 		self.check_gl_entries()
+  
+	def test_opening_entry_TC_ACC_116(self):
+		jv = frappe.get_doc({
+			"doctype": "Journal Entry",
+			"voucher_type": "Opening Entry",
+			"company": "_Test Company",
+			"posting_date": frappe.utils.nowdate(),
+			"accounts":[
+				{
+					"account":"_Test Payable - _TC",
+					"party_type": "Supplier",
+					"party": "_Test Supplier",
+					"debit_in_account_currency":1000,
+				},
+				{
+					"account": "_Test Creditors - _TC",
+					"credit_in_account_currency":1000,
+					"party_type": "Supplier",
+					"party": "_Test Supplier"
+				},
+				{
+					"account":"Debtors - _TC",
+					"party_type":"Customer",
+					"party": "_Test Customer",
+					"debit_in_account_currency":1000,
+				},
+				{
+					"account":"_Test Receivable - _TC",
+					"party_type":"Customer",
+					"party": "_Test Customer",
+					"credit_in_account_currency":1000,
+				},
+				{
+					"account":"Cash - _TC",
+					"debit_in_account_currency":2000
+				},
+				{
+					"account":"Temporary Opening - _TC",
+					"credit_in_account_currency":2000
+				}
+			]
+		}).insert()
+		jv.submit()
+		self.voucher_no = jv.name
+		self.fields = [
+			"account",
+			"account_currency",
+			"debit",
+			"debit_in_account_currency",
+			"credit",
+			"credit_in_account_currency",
+		]
+
+		self.expected_gle = [
+				{
+					'account': 'Cash - _TC',
+					'account_currency': 'INR',
+					'debit': 2000.0,
+					'debit_in_account_currency': 2000.0,
+					'credit': 0.0,
+					'credit_in_account_currency': 0.0
+				},
+				{
+					'account': 'Debtors - _TC',
+					'account_currency': 'INR',
+					'debit': 1000.0,
+					'debit_in_account_currency': 1000.0,
+					'credit': 0.0,
+					'credit_in_account_currency': 0.0
+				},
+				{
+					'account': 'Temporary Opening - _TC',
+					'account_currency': 'INR',
+					'debit': 0.0,
+					'debit_in_account_currency': 0.0,
+					'credit': 2000.0,
+					'credit_in_account_currency': 2000.0
+				},
+				{
+					'account': '_Test Creditors - _TC',
+					'account_currency': 'INR',
+					'debit': 0.0,
+					'debit_in_account_currency': 0.0,
+					'credit': 1000.0,
+					'credit_in_account_currency': 1000.0
+				},
+				{
+					'account': '_Test Payable - _TC',
+					'account_currency': 'INR',
+					'debit': 1000.0,
+					'debit_in_account_currency': 1000.0,
+					'credit': 0.0,
+					'credit_in_account_currency': 0.0
+				},
+				{
+					'account': '_Test Receivable - _TC',
+					'account_currency': 'INR',
+					'debit': 0.0,
+					'debit_in_account_currency': 0.0,
+					'credit': 1000.0,
+					'credit_in_account_currency': 1000.0
+				}
+			]
+
+		self.check_gl_entries()
+   
 def make_journal_entry(
 	account1,
 	account2,

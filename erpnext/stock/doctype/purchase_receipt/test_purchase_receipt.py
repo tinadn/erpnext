@@ -4199,7 +4199,53 @@ class TestPurchaseReceipt(FrappeTestCase):
 		# Cancel Stock Reco and check SLE and GL
 		sr.cancel()
 		self.check_cancel_stock_gl_sle(sr, 20, -3000.0)
-	
+	def test_purchase_receipt_with_serialized_item_TC_SCK_145(self):
+		item_code = "ADI-SH-W09"
+		warehouse = "Stores - _TC"
+		supplier = "Test Supplier 1"
+		company = "_Test Company"
+		qty = 5
+
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"is_stock_item": 1,
+				"is_purchase_item": 1,
+				"has_serial_no": 1,
+				"serial_no_series": "SERI-.#####",
+				"company": company
+			})
+			item.insert()
+
+		pr = frappe.get_doc({
+			"doctype": "Purchase Receipt",
+			"supplier": supplier,
+			"company": company,
+			"posting_date": "2025-01-03",
+			"set_warehouse": warehouse,
+			"items": [{
+				"item_code": item_code,
+				"warehouse": warehouse,
+				"qty": qty,
+				"rate": 100
+			}]
+		})
+		pr.insert()
+		pr.submit()
+
+		self.assertEqual(pr.docstatus, 1)
+		self.assertEqual(len(pr.items), 1)
+		self.assertEqual(pr.items[0].item_code, item_code)
+		self.assertEqual(pr.items[0].qty, qty)
+
+		serial_nos = get_serial_nos_from_bundle(pr.items[0].serial_and_batch_bundle)
+		self.assertEqual(len(serial_nos), qty)
+
+		for serial_no in serial_nos:
+			status = frappe.db.get_value("Serial No", serial_no, "status")
+			self.assertEqual(status, "Active")
 	def _test_create_2pr_with_item_fifo_and_sr(self):
 		from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import (
 			create_stock_reconciliation,

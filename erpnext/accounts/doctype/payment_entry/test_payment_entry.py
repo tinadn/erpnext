@@ -1900,7 +1900,7 @@ class TestPaymentEntry(FrappeTestCase):
 		rate=2,
 		from_date=frappe.utils.get_date_str('01-04-2024'),
 		to_date=frappe.utils.get_date_str('31-03-2025'),
-		account="Test TDS Payable - _TC",
+		account="_Test TDS Payable - _TC",
 		single_threshold=30000,
 		cumulative_threshold=100000,
 		consider_party_ledger_amount=1,
@@ -1949,25 +1949,13 @@ class TestPaymentEntry(FrappeTestCase):
 			
 			payment_entry.save()
 			payment_entry.submit()
-			gl=self.get_gle(payment_entry.name)
-			expected_result=[
-					{
-						'account': 'Cash - _TC', 
-						'debit': 0.0, 'credit': 78400.0,
-						'against_voucher': None}, 
-					{
-					'account': 'Creditors - _TC',
-					'debit': 80000.0, 'credit': 0.0, 
-					'against_voucher': None
-					},
-					{
-					'account': '_Test TDS Payable - _TC', 
-					'debit': 0.0, 'credit': 1600.0, 
-					'against_voucher': None
-					}
-					]
-			self.assertEqual(gl,expected_result)
-    
+			self.voucher_no = payment_entry.name
+			self.expected_gle =[
+       				{'account': '_Test TDS Payable - _TC', 'debit': 0.0, 'credit': payment_entry.base_total_taxes_and_charges}, 
+					{'account': 'Creditors - _TC', 'debit': payment_entry.base_paid_amount, 'credit': 0.0}, 
+     				{'account': 'Cash - _TC', 'debit': 0.0, 'credit':payment_entry.received_amount_after_tax}
+     			]	
+			self.check_gl_entries()
 	def test_link_advance_payment_with_purchase_invoice_TC_ACC_022(self):
 		create_records('_Test Supplier TDS')
 		supplier=frappe.get_doc("Supplier","_Test Supplier TDS")
@@ -2018,73 +2006,24 @@ class TestPaymentEntry(FrappeTestCase):
 				})
 				pi.save()
 				pi.submit()
+				self.voucher_no = pi.name
+				self.expected_gle =[
+        			{'account': '_Test TDS Payable - _TC', 'debit': 0.0, 'credit': 200.0},
+           			{'account': '_Test Account Excise Duty - _TC', 'debit': 90000.0, 'credit': 0.0}, 
+              		{'account': 'Creditors - _TC', 'debit': 200.0, 'credit': 0.0}, 
+                	{'account': 'Creditors - _TC', 'debit': 0.0, 'credit': 90000.0}
+                 ]
+				self.check_gl_entries()
 				
-				pi_gl = frappe.db.sql(
-					"""select account, cost_center, account_currency, debit, credit,
-					debit_in_account_currency, credit_in_account_currency
-					from `tabGL Entry` where voucher_type='Purchase Invoice' and voucher_no=%s
-					order by account asc""",
-					pi.name,
-					as_dict=1,
-				)
-				expected_gl_of_pi=[
-				{
-					"account": "Creditors - _TC",
-					"cost_center": None,
-					"account_currency": "INR",
-					"debit": 0.0,
-					"credit": 90000.0,
-					"debit_in_account_currency": 0.0,
-					"credit_in_account_currency": 90000.0
-				},
-				{
-					"account": "Creditors - _TC",
-					"cost_center": None,
-					"account_currency": "INR",
-					"debit": 200.0,
-					"credit": 0.0,
-					"debit_in_account_currency": 200.0,
-					"credit_in_account_currency": 0.0
-				},
-				{
-					"account": "Stock Received But Not Billed - _TC",
-					"cost_center": "Main - _TC",
-					"account_currency": "INR",
-					"debit": 90000.0,
-					"credit": 0.0,
-					"debit_in_account_currency": 90000.0,
-					"credit_in_account_currency": 0.0
-				},
-				{
-					"account": "_Test TDS Payable - _TC",
-					"cost_center": "Main - _TC",
-					"account_currency": "INR",
-					"debit": 0.0,
-					"credit": 200.0,
-					"debit_in_account_currency": 0.0,
-					"credit_in_account_currency": 200.0
-				}
-				]
-				self.assertEqual(pi_gl,expected_gl_of_pi)
 				pe=get_payment_entry("Purchase Invoice",pi.name)
 				pe.save()
 				pe.submit()
-				pe_gl=self.get_gle(pe.name)
-				expected_pl_gl=[
-				{
-					"account": "Cash - _TC",
-					"debit": 0.0,
-					"credit": 9800.0,
-					"against_voucher": None
-				},
-				{
-					"account": "Creditors - _TC",
-					"debit": 9800.0,
-					"credit": 0.0,
-					"against_voucher": pi.name
-				}
-				]
-				self.assertEqual(pe_gl,expected_pl_gl)
+				self.expected_gle =[
+        			{'account': 'Creditors - _TC', 'debit': 9800.0, 'credit': 0.0}, 
+           			{'account': 'Cash - _TC', 'debit': 0.0, 'credit': 9800.0}
+              	]
+				self.voucher_no=pe.name
+				self.check_gl_entries()
 
         
     

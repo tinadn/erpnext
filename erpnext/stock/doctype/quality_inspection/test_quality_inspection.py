@@ -445,6 +445,32 @@ class TestQualityInspection(FrappeTestCase):
 		pr.reload()
 		pr.cancel()
 
+	def test_qa_for_dn_prcs_TC_SCK_167(self):
+		dn = create_delivery_note(item_code="_Test Item with QA", do_not_submit=True)
+		self.assertRaises(QualityInspectionRequiredError, dn.submit)
+
+		qa = create_quality_inspection(
+			reference_type="Delivery Note", reference_name=dn.name, status="Rejected", inspection_type="In Process"
+		)
+		dn.reload()
+		self.assertRaises(QualityInspectionRejectedError, dn.submit)
+		frappe.db.set_value("Quality Inspection", qa.name, "status", "Accepted")
+		qa.reload()
+		qa.cancel()
+
+	def test_qa_for_dn_out_TC_SCK_168(self):
+		dn = create_delivery_note(item_code="_Test Item with QA", do_not_submit=True)
+		self.assertRaises(QualityInspectionRequiredError, dn.submit)
+
+		qa = create_quality_inspection(
+			reference_type="Delivery Note", reference_name=dn.name, status="Rejected", inspection_type="Outgoing"
+		)
+		dn.reload()
+		self.assertRaises(QualityInspectionRejectedError, dn.submit)
+		frappe.db.set_value("Quality Inspection", qa.name, "status", "Accepted")
+		qa.reload()
+		qa.cancel()
+
 def create_quality_inspection(**args):
 	args = frappe._dict(args)
 	qa = frappe.new_doc("Quality Inspection")

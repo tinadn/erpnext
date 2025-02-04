@@ -156,6 +156,9 @@ def get_party_tax_withholding_details(inv, tax_withholding_category=None):
 		}
 	)
 
+	if cint(tax_details.round_off_tax_amount):
+		inv.round_off_applicable_accounts_for_tax_withholding = tax_details.account_head
+
 	if inv.doctype == "Purchase Invoice":
 		return tax_row, tax_deducted_on_advances, voucher_wise_amount
 	else:
@@ -511,10 +514,10 @@ def get_tds_amount(ldc, parties, inv, tax_details, vouchers):
 		payment_entry_filters.pop("apply_tax_withholding_amount", None)
 		payment_entry_filters.pop("tax_withholding_category", None)
 
-	supp_credit_amt = (frappe.db.get_list("Purchase Invoice", invoice_filters, field)[0].get('sum') or 0.0)
+	supp_inv_credit_amt = frappe.db.get_value("Purchase Invoice", invoice_filters, field) or 0.0
 
 	supp_jv_credit_amt = (
-		frappe.db.get_list(
+		frappe.db.get_value(
 			"Journal Entry Account",
 			{
 				"parent": ("in", vouchers),
@@ -535,7 +538,7 @@ def get_tds_amount(ldc, parties, inv, tax_details, vouchers):
 		group_by="payment_type",
 	)
 
-	supp_credit_amt += supp_jv_credit_amt
+	supp_credit_amt = supp_jv_credit_amt
 	supp_credit_amt += inv.get("tax_withholding_net_total", 0)
 
 	for type in payment_entry_amounts:
@@ -552,19 +555,19 @@ def get_tds_amount(ldc, parties, inv, tax_details, vouchers):
 	else:
 		tax_withholding_net_total = inv.get("tax_withholding_net_total", 0)
 
-	if (threshold and tax_withholding_net_total >= threshold) or (
-		cumulative_threshold and supp_credit_amt >= cumulative_threshold
-	):
-		if (cumulative_threshold and supp_credit_amt >= cumulative_threshold) and cint(
-			tax_details.tax_on_excess_amount
-		):
-			# Get net total again as TDS is calculated on net total
-			# Grand is used to just check for threshold breach
-			net_total = (
-				frappe.db.get_value("Purchase Invoice", invoice_filters, "sum(tax_withholding_net_total)")
-				or 0.0
-			)
-			net_total += inv.tax_withholding_net_total
+	has_cumulative_threshold_breached = (
+		cumulative_threshold and (supp_credit_amt + supp_inv_credit_amt) >= cumulative_threshold
+	)
+
+	if (threshold and tax_withholding_net_total >= threshold) or (has_cumulative_threshold_breached):
+		# Get net total again as TDS is calculated on net total
+		# Grand is used to just check for threshold breach
+		net_total = (
+			frappe.db.get_value("Purchase Invoice", invoice_filters, "sum(tax_withholding_net_total)") or 0.0
+		)
+		supp_credit_amt += net_total
+
+		if has_cumulative_threshold_breached and cint(tax_details.tax_on_excess_amount):
 			supp_credit_amt = net_total + tax_withholding_net_total - cumulative_threshold
 
 		if ldc and is_valid_certificate(ldc, inv.get("posting_date") or inv.get("transaction_date"), 0):

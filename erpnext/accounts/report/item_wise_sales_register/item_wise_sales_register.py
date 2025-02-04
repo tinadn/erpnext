@@ -138,7 +138,7 @@ def _execute(filters=None, additional_table_columns=None, additional_conditions=
 		data.append(row)
 
 	if filters.get("group_by") and item_list:
-		total_row = total_row_map.get(prev_group_by_value or d.get("item_name"))
+		total_row = total_row_map.get(prev_group_by_value) or total_row_map.get(d.get("item_name"))
 		total_row["percent_gt"] = flt(total_row["total"] / grand_total * 100)
 		data.append(total_row)
 		data.append({})
@@ -318,7 +318,7 @@ def get_columns(additional_table_columns, filters):
 			"width": 100,
 		},
 		{
-			"label": _("Tax Rate"),
+			"label": _("Rate"),
 			"fieldname": "rate",
 			"fieldtype": "Float",
 			"options": "currency",
@@ -735,7 +735,6 @@ def add_total_row(
 			add_sub_total_row(total_row, total_row_map, "total_row", tax_columns)
 
 		prev_group_by_value = item.get(group_by_field, "")
-
 		total_row_map.setdefault(
 			item.get(group_by_field, ""),
 			{
@@ -810,25 +809,14 @@ def get_group_by_and_display_fields(filters):
 
 
 def add_sub_total_row(item, total_row_map, group_by_value, tax_columns):
-    if group_by_value not in total_row_map:
-        total_row_map[group_by_value] = {
-            "stock_qty": 0.0,
-            "amount": 0.0,
-            "total_tax": 0.0,
-            "total": 0.0,
-            "percent_gt": 0.0
-        }
-    
-    total_row = total_row_map.get(group_by_value)
-    
-    total_row["stock_qty"] += item.get("stock_qty", 0)
-    total_row["amount"] += item.get("amount", 0)
-    total_row["total_tax"] += item.get("total_tax", 0)
-    total_row["total"] += item.get("total", 0)
-    total_row["percent_gt"] += item.get("percent_gt", 0)
+	total_row = total_row_map.get(group_by_value)
+	total_row["stock_qty"] += item["stock_qty"]
+	total_row["amount"] += item["amount"]
+	total_row["total_tax"] += item["total_tax"]
+	total_row["total"] += item["total"]
+	total_row["percent_gt"] += item["percent_gt"]
 
-    for tax in tax_columns:
-        tax_amount_field = frappe.scrub(tax + " Amount")
-        total_row.setdefault(tax_amount_field, 0.0)
-        total_row[tax_amount_field] += item.get(tax_amount_field, 0.0)
+	for tax in tax_columns:
+		total_row.setdefault(frappe.scrub(tax + " Amount"), 0.0)
+		total_row[frappe.scrub(tax + " Amount")] += flt(item[frappe.scrub(tax + " Amount")])
 

@@ -10,6 +10,7 @@ from frappe.test_runner import make_test_objects
 from frappe.tests.utils import FrappeTestCase, change_settings
 from frappe.utils import add_days, today
 import re
+import random
 
 from erpnext.controllers.item_variant import (
 	InvalidItemAttributeValueError,
@@ -69,7 +70,13 @@ def make_item(item_code=None, properties=None, uoms=None, barcode=None):
 				"barcode": barcode,
 			},
 		)
-
+	if 'india_compliance' in frappe.get_installed_apps():
+		gst_hsn_code = random.choice(frappe.db.get_all("GST HSN Code", pluck = 'name'))
+		if not frappe.db.exists("GST HSN Code", gst_hsn_code):
+			gst_hsn_code = frappe.new_doc("GST HSN Code")
+			gst_hsn_code.hsn_code = "11112222"
+			gst_hsn_code.save()
+		item.gst_hsn_code = gst_hsn_code
 	item.insert()
 
 	return item
@@ -960,6 +967,14 @@ def create_item(
 				"buying_cost_center": buying_cost_center,
 			},
 		)
+		
+		if 'india_compliance' in frappe.get_installed_apps():
+			gst_hsn_code = "11112222"
+			if not frappe.db.exists("GST HSN Code", gst_hsn_code):
+				gst_hsn_code = frappe.new_doc("GST HSN Code")
+				gst_hsn_code.hsn_code = "11112222"
+				gst_hsn_code.save()
+			item.gst_hsn_code = gst_hsn_code
 		item.save()
 	else:
 		item = frappe.get_doc("Item", item_code)
