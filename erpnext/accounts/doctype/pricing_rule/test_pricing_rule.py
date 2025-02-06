@@ -1659,7 +1659,7 @@ class TestPricingRule(FrappeTestCase):
 		coupon_code.insert()
 		self.assertEqual(coupon_code.coupon_type, "Gift Card")
 		self.assertEqual(coupon_code.pricing_rule, pr.name)
-test_dependencies = ["Campaign"]
+# test_dependencies = ["Campaign"]
 
 
 def make_pricing_rule(**args):

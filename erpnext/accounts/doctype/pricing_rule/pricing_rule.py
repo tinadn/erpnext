@@ -29,7 +29,7 @@ class PricingRule(Document):
 		from erpnext.accounts.doctype.pricing_rule_item_group.pricing_rule_item_group import PricingRuleItemGroup
 		from frappe.types import DF
 
-		applicable_for: DF.Literal["", "Customer", "Customer Group", "Territory", "Sales Partner", "Campaign", "Supplier", "Supplier Group"]
+		applicable_for: DF.Literal["", "Customer", "Customer Group", "Territory", "Supplier", "Supplier Group"]
 		apply_discount_on: DF.Literal["Grand Total", "Net Total"]
 		apply_discount_on_rate: DF.Check
 		apply_multiple_pricing_rules: DF.Check
@@ -171,7 +171,7 @@ class PricingRule(Document):
 			"Customer Group",
 			"Territory",
 			"Sales Partner",
-			"Campaign",
+			# "Campaign",
 		]:
 			throw(
 				_("Selling must be checked, if Applicable For is selected as {0}").format(self.applicable_for)
@@ -298,7 +298,7 @@ def apply_pricing_rule(args, doc=None):
 	        "plc_conversion_rate": "something",
 	        "company": "something",
 	        "transaction_date": "something",
-	        "campaign": "something",
+	       
 	        "sales_partner": "something",
 	        "ignore_pricing_rule": "something"
 	}

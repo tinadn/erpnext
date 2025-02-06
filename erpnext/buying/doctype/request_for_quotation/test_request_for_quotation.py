@@ -5,17 +5,14 @@
 from urllib.parse import urlparse
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests.utils import FrappeTestCase,if_app_installed
 from frappe.utils import nowdate
-
 from erpnext.buying.doctype.request_for_quotation.request_for_quotation import (
 	RequestforQuotation,
 	create_supplier_quotation,
 	get_pdf,
 	make_supplier_quotation_from_rfq,
 )
-from crm.crm.doctype.opportunity.opportunity import make_request_for_quotation as make_rfq
-from crm.crm.doctype.opportunity.test_opportunity import make_opportunity
 from erpnext.stock.doctype.item.test_item import make_item
 from erpnext.templates.pages.rfq import check_supplier_has_docname_access
 
@@ -107,7 +104,10 @@ class TestRequestforQuotation(FrappeTestCase):
 		self.assertEqual(supplier_quotation.items[0].qty, 5)
 		self.assertEqual(supplier_quotation.items[0].stock_qty, 10)
 
+	@if_app_installed("crm")
 	def test_make_rfq_from_opportunity(self):
+		from crm.crm.doctype.opportunity.opportunity import make_request_for_quotation as make_rfq
+		from crm.crm.doctype.opportunity.test_opportunity import make_opportunity
 		opportunity = make_opportunity(with_items=1)
 		supplier_data = get_supplier_data()
 		rfq = make_rfq(opportunity.name)
