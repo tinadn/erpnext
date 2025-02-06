@@ -3308,7 +3308,72 @@ class TestPurchaseOrder(FrappeTestCase):
 		doc_pi= make_purchase_invoice(doc_pr.name)
 		doc_pi.save()
 		doc_pi.submit()
-			
+
+	def test_po_to_qi_to_pr_pi_TC_B_148(self):
+		item = create_item("Testing Item QI")
+		item.inspection_required_before_purchase = 1
+		template = "Syringe"
+		if not frappe.db.exists("Quality Inspection Template", template):
+			template = create_quality_inspection_template(template)
+		item.inspection_required_before_delivery = 1
+		item.quality_inspection_template = template
+		item.opening_stock = 1000
+		item.valuation_rate = 100
+		item.save()
+
+		po_data = {
+			"company" : "_Test Company",
+			"supplier": "_Test Supplier",
+			"item_code" : item.item_code,
+			"warehouse" : "_Test Warehouse 1 - _TC",
+			"qty" : 5,
+			"rate" : 200
+		}
+		po = create_purchase_order(**po_data)
+		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+		pr = make_purchase_receipt(po.name)
+		pr.save()
+		from erpnext.stock.doctype.quality_inspection.test_quality_inspection import create_quality_inspection
+		readings = [
+			{
+				"specification": "Needle Shape",
+				"reading_value": "OK",
+			},
+			{
+				"specification": "Syringe Shape",
+				"reading_value": "OK",
+			},
+			{
+				"specification": "Plastic Clarity",
+				"reading_value": "OK",
+			},
+			{
+				"specification": "Syringe Length",
+				"reading_value": 5,
+			},
+		]
+
+		qi = create_quality_inspection(reference_type=pr.doctype, reference_name=pr.name,inspection_type="Incoming", item_code=item.item_code, readings=readings, do_not_save=True)
+		qi.save()
+		qi.submit()
+		self.assertEqual(qi.readings[0].status, "Accepted")
+		self.assertEqual(qi.readings[1].status, "Accepted")
+		self.assertEqual(qi.readings[2].status, "Accepted")
+		self.assertEqual(qi.readings[3].status, "Accepted")
+		pr.reload()
+		pr.submit()
+		self.assertEqual(pr.status, "To Bill")
+		gl_entries_pr = get_gl_entries(pr.name)
+		for gl_entries in gl_entries_pr:
+			if gl_entries['account'] == "Stock In Hand - _TC":
+				self.assertEqual(gl_entries['debit'], 1000)
+			elif gl_entries['account'] == "Stock Received But Not Billed - _TC":
+				self.assertEqual(gl_entries['credit'], 1000)
+		doc_pi= make_purchase_invoice(pr.name)
+		doc_pi.save()
+		doc_pi.submit()
+		self.assertEqual(doc_pi.status, "Unpaid")
+
 	def test_po_ignore_pricing_rule_TC_B_049(self):
 		company = "_Test Company"
 		item_code = "Testing-31"
@@ -8022,3 +8087,32 @@ def get_tax_template(company, tax_template, rate):
 		tax_template.insert(ignore_if_duplicate=True)
 
 		return tax_template.name
+
+def create_quality_inspection_template(template):
+	if not frappe.db.exists(template):
+		qi_template = frappe.get_doc(
+			{
+			"doctype":"Quality Inspection Template",
+			"item_quality_inspection_parameter":[
+				{
+					"specification":"Needle Shape",
+					"value":"OK"
+				},
+				{
+					"specification":"Syringe Shape",
+					"value":"OK"
+				},
+				{
+					"specification":"Plastic Clarity",
+					"value":"OK"
+				},
+				{
+					"specification":"Syringe Length",
+					"min_value":4,
+					"max_value":6
+				},
+			]
+			}
+		)
+		qi_template.insert(ignore_if_duplicate=True)
+		return qi_template.name
