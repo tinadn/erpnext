@@ -11,6 +11,7 @@ from frappe.tests.utils import FrappeTestCase, change_settings
 from frappe.utils import add_days, today
 import re
 import random
+from erpnext.stock.doctype.warehouse.warehouse import convert_to_group_or_ledger
 
 from erpnext.controllers.item_variant import (
 	InvalidItemAttributeValueError,
@@ -998,6 +999,31 @@ class TestItem(FrappeTestCase):
 		self.assertEqual(item.item_code, "_Test Template Item")
 		self.assertEqual(item.has_variants, 1)
 		self.assertEqual(item.attributes[0].attribute, "Test Size")
+	
+	def test_auto_reorder_item_TC_SCK_126(self):
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+		group_warehouse = frappe.get_doc("Warehouse", create_warehouse("TestGroup"))
+		convert_to_group_or_ledger(group_warehouse.name)
+		group_warehouse.reload()
+		self.assertEqual(group_warehouse.is_group, 1)
+		item = make_item(
+			"Test Auto Reorder Item",
+			{
+				"reorder_levels": [
+					{
+						"warehouse_group":group_warehouse.name,
+						"warehouse":create_warehouse("Test Store", {"parent_warehouse":group_warehouse.name}),
+						"warehouse_reorder_level":100,
+						"warehouse_reorder_qty":200,
+						"material_request_type":"Purchase"
+					}
+				]
+			}
+		)
+		self.assertEqual(item.reorder_levels[0].warehouse_group, group_warehouse.name)
+		self.assertEqual(item.reorder_levels[0].warehouse_reorder_level, 100)
+		self.assertEqual(item.reorder_levels[0].warehouse_reorder_qty, 200)
+		self.assertEqual(item.reorder_levels[0].material_request_type, "Purchase")
 
 def set_item_variant_settings(fields):
 	doc = frappe.get_doc("Item Variant Settings")
