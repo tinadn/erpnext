@@ -5,6 +5,7 @@
 from frappe.permissions import add_user_permission, remove_user_permission
 from frappe.tests.utils import FrappeTestCase, change_settings
 from frappe.utils import add_days, cstr, flt, get_time, getdate, nowtime, today
+from frappe.desk.query_report import run
 
 from erpnext.accounts.doctype.account.test_account import get_inventory_account
 from erpnext.stock.doctype.item.test_item import (
@@ -2886,6 +2887,33 @@ class TestStockEntry(FrappeTestCase):
 				]
 			),
 		)
+	
+	def test_stock_manufacture_with_batch_serieal_TC_SCK_140(self):
+		company = "_Test Company"
+		if not frappe.db.exists("Company", company):
+			company_doc = frappe.new_doc("Company")
+			company_doc.company_doc_name = company
+			company_doc.country="India",
+			company_doc.default_currency= "INR",
+			company_doc.save()
+		else:
+			company_doc = frappe.get_doc("Company", company) 
+		item = make_item("ADI-SH-W11", {'has_batch_no':1, "create_new_batch":1, "has_serial_no":1, "valuation_rate":100})
+		se = make_stock_entry(item_code=item.name,purpose="Manufacture", company=company_doc.name,target=create_warehouse("Test Warehouse"), qty=150, basic_rate=100,do_not_save=True)
+		se.items[0].is_finished_item = 1
+		se.save()
+		se.submit()
+		self.assertEqual(se.purpose, "Manufacture")
+		self.assertEqual(se.items[0].is_finished_item, 1)
+		serial_and_batch = run("Serial and Batch Summary",
+						  filters={"company":company_doc.name,
+						  		"from_date":se.posting_date,
+								"to_date":se.posting_date,
+								"voucher_type":"Stock Entry",
+								"voucher_no":[se.name]})
+		result_list = serial_and_batch.get("result", [])
+		self.assertEqual(len(result_list), 150)
+
 def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
 		bom = frappe.new_doc("BOM")
 		bom.update(
