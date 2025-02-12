@@ -6957,6 +6957,78 @@ class TestPurchaseOrder(FrappeTestCase):
 			self.assertEqual(entry["debit"], expected_pi_entries.get(entry["account"], {}).get("debit", 0))
 			self.assertEqual(entry["credit"], expected_pi_entries.get(entry["account"], {}).get("credit", 0))
 
+	def test_multicurrecy_TC_B_099(self):
+		company = "_Test Company"
+		if not frappe.db.exists("Company", company):
+			company = frappe.new_doc("Company")
+			company.company_name = company
+			company.country="India",
+			company.default_currency= "INR",
+			company.save()
+		else:
+			company = frappe.get_doc("Company", company)
+		warehouse = create_warehouse("Stores - _TC", company=company.name)
+		supplier = create_supplier(supplier_name="_Test Supplier 123", default_currency="USD")
+		account = self.create_account("Creditors USD 12", company.name, "USD", "Accounts Payable - _TC")
+		if not [x for x in supplier.accounts if x.company == company.name]:
+			supplier.append("accounts", {"company": company.name, "account": account.name})
+			supplier.save()
+		bank_name = "Bank Of America"
+		bank = frappe.get_doc("Bank", bank_name) if frappe.db.exists("Bank", bank_name) else None
+		if not bank:
+			bank = frappe.new_doc("Bank")
+			bank.bank_name = bank_name
+			bank.insert()
+
+		bank_account_name = f"{bank_name} - {bank_name}"
+		if not frappe.db.exists("Bank Account", bank_account_name):
+			bank_account = frappe.new_doc("Bank Account")
+			bank_account.account_name = bank_name
+			bank_account.bank = bank.name
+			bank_account.account_type = "Current A/c"
+			bank_account.company = company.name
+			bank_account.is_company_account = 1
+			bank_account.insert()
+		else:
+			bank_account = frappe.get_doc("Bank Account", bank_account_name)
+
+		item = create_item("Testing-312")
+		po_doc = create_purchase_order(qty=10,company=company.name,supplier=supplier.name,item=item.item_code, warehouse=warehouse,rate=1.59, currency="USD", do_not_save=1)
+		po_doc.conversion_rate = 62.9
+		po_doc.save()
+		po_doc.submit()
+		self.assertEqual(po_doc.base_total, 1000.11)
+		pr = make_purchase_receipt(po_doc.name)
+		pr.save()
+		pr.submit()
+		self.assertEqual(pr.items[0].received_qty, 10)
+		self.assertEqual(pr.base_total, 1000.11) 
+		pi = make_purchase_invoice(pr.name)
+		pi.save()
+		pi.submit()
+		pr_gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": pi.name}, fields=["account", "debit", "credit"])
+		for gl_entries_pr in pr_gl_entries:
+			if gl_entries_pr['account'] == "Stock In Hand - _TC":
+				self.assertEqual(gl_entries_pr['debit'], 1000.11)
+			elif gl_entries_pr['account'] == "Stock Received But Not Billed - _TC":
+				self.assertEqual(gl_entries_pr['credit'], 1000.11)
+
+		pe = get_payment_entry(pi.doctype, pi.name, bank_account=pi.credit_to)
+		pe.mode_of_payment = "Bank Draft"
+		pe.posting_date = add_days(pi.posting_date, 1)
+		pe.bank_account = bank_account.name
+		pe.paid_from = "Cash - _TC"
+		pe.paid_from_account_currency = "INR"
+		pe.reference_no = "123"
+		pe.reference_date = nowdate()
+		pe.paid_to_account_currency = pi.currency
+		pe.target_exchange_rate = 60
+		pe.source_exchange_rate = 60
+		pe.paid_amount = pi.grand_total
+		pe.save(ignore_permissions=True)
+		pe.submit()
+
+
 	def test_po_with_environmental_cess_pr_pi_TC_B_138(self):
 		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
 		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_invoice
