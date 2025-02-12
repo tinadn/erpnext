@@ -479,13 +479,13 @@ def reconcile_against_document(
 
 		# For payments with `Advance` in separate account feature enabled, only new ledger entries are posted for each reference.
 		# No need to cancel/delete payment ledger entries
-		if voucher_type == "Payment Entry" and doc.book_advance_payments_in_separate_party_account:
-			if repost_whole_ledger:
-				doc.make_gl_entries(cancel=1, clearing_date=clearing_date)
-			else:
-				doc.make_advance_gl_entries(cancel=1, clearing_date=clearing_date)
-		else:
-			_delete_pl_entries(voucher_type, voucher_no)
+		# if voucher_type == "Payment Entry" and doc.book_advance_payments_in_separate_party_account:
+		# 	if repost_whole_ledger:
+		# 		doc.make_gl_entries(cancel=1, clearing_date=clearing_date)
+		# 	else:
+		# 		doc.make_advance_gl_entries(cancel=1, clearing_date=clearing_date)
+		# else:
+		# 	_delete_pl_entries(voucher_type, voucher_no)
 
 		for entry in entries:
 			check_if_advance_entry_modified(entry)
@@ -529,7 +529,7 @@ def reconcile_against_document(
 			from erpnext.accounts.general_ledger import process_debit_credit_difference
 
 			process_debit_credit_difference(gl_map)
-			create_payment_ledger_entry(gl_map, update_outstanding="No", cancel=0, adv_adj=1)
+			create_payment_ledger_entry(gl_map, update_outstanding="No", cancel=0, adv_adj=1, reconcile= True)
 
 		# Only update outstanding for newly linked vouchers
 		for entry in entries:
@@ -1753,7 +1753,7 @@ def auto_create_exchange_rate_revaluation_monthly() -> None:
 	create_err_and_its_journals(companies)
 
 
-def get_payment_ledger_entries(gl_entries, cancel=0):
+def get_payment_ledger_entries(gl_entries, cancel=0, reconcile = False):
 	ple_map = []
 	if gl_entries:
 		ple = None
@@ -1792,45 +1792,112 @@ def get_payment_ledger_entries(gl_entries, cancel=0):
 					dr_or_cr *= -1
 					dr_or_cr_account_currency *= -1
 
-				ple = frappe._dict(
-					doctype="Payment Ledger Entry",
-					posting_date=gle.posting_date,
-					company=gle.company,
-					account_type=account_type,
-					account=gle.account,
-					party_type=gle.party_type,
-					party=gle.party,
-					cost_center=gle.cost_center,
-					finance_book=gle.finance_book,
-					due_date=gle.due_date,
-					voucher_type=gle.voucher_type,
-					voucher_no=gle.voucher_no,
-					voucher_detail_no=gle.voucher_detail_no,
-					against_voucher_type=gle.against_voucher_type
-					if gle.against_voucher_type
-					else gle.voucher_type,
-					against_voucher_no=gle.against_voucher if gle.against_voucher else gle.voucher_no,
-					account_currency=gle.account_currency,
-					amount=dr_or_cr,
-					amount_in_account_currency=dr_or_cr_account_currency,
-					delinked=True if cancel else False,
-					remarks=gle.remarks,
-				)
+				if(gle.voucher_type == "Payment Entry" and gle.against_voucher_type and  not reconcile):
+					ple = frappe._dict(
+						doctype="Payment Ledger Entry",
+						posting_date=gle.posting_date,
+						company=gle.company,
+						account_type=account_type,
+						account=gle.account,
+						party_type=gle.party_type,
+						party=gle.party,
+						cost_center=gle.cost_center,
+						finance_book=gle.finance_book,
+						due_date=gle.due_date,
+						voucher_type=gle.voucher_type,
+						voucher_no=gle.voucher_no,
+						voucher_detail_no=gle.voucher_detail_no,
+						account_currency=gle.account_currency,
+						amount=dr_or_cr,
+						amount_in_account_currency=dr_or_cr_account_currency,
+						delinked=True if cancel else False,
+						remarks=gle.remarks,
+					)
+					dimensions_and_defaults = get_dimensions()
+					if dimensions_and_defaults:
+						for dimension in dimensions_and_defaults[0]:
+							ple[dimension.fieldname] = gle.get(dimension.fieldname)
 
-				dimensions_and_defaults = get_dimensions()
-				if dimensions_and_defaults:
-					for dimension in dimensions_and_defaults[0]:
-						ple[dimension.fieldname] = gle.get(dimension.fieldname)
+					ple_map.append(ple)
 
-				ple_map.append(ple)
+					ple = frappe._dict(
+						doctype="Payment Ledger Entry",
+						posting_date=gle.posting_date,
+						company=gle.company,
+						account_type=account_type,
+						account=gle.account,
+						party_type=gle.party_type,
+						party=gle.party,
+						cost_center=gle.cost_center,
+						finance_book=gle.finance_book,
+						due_date=gle.due_date,
+						voucher_type=gle.against_voucher_type,
+						voucher_no=gle.against_voucher,
+						against_voucher_type=gle.voucher_type,
+						against_voucher_no=gle.voucher_no,
+						voucher_detail_no=gle.voucher_detail_no,
+						account_currency=gle.account_currency,
+						amount=dr_or_cr,
+						amount_in_account_currency=dr_or_cr_account_currency,
+						delinked=True if cancel else False,
+						remarks=gle.remarks,
+					)
+					dimensions_and_defaults = get_dimensions()
+					if dimensions_and_defaults:
+						for dimension in dimensions_and_defaults[0]:
+							ple[dimension.fieldname] = gle.get(dimension.fieldname)
+
+					ple_map.append(ple)
+					
+
+				else:
+					if(reconcile == True):
+						voucher_type=gle.against_voucher_type
+						voucher_no=gle.against_voucher
+						against_voucher_type=gle.voucher_type
+						against_voucher_no=gle.voucher_no
+					else:
+						voucher_type=gle.voucher_type
+						voucher_no=gle.voucher_no
+						against_voucher_type=gle.against_voucher_type if gle.against_voucher_type != gle.voucher_type else ""
+						against_voucher_no=gle.against_voucher if gle.against_voucher != gle.voucher_no else ""
+					ple = frappe._dict(
+						doctype="Payment Ledger Entry",
+						posting_date=gle.posting_date,
+						company=gle.company,
+						account_type=account_type,
+						account=gle.account,
+						party_type=gle.party_type,
+						party=gle.party,
+						cost_center=gle.cost_center,
+						finance_book=gle.finance_book,
+						due_date=gle.due_date,
+						voucher_type=voucher_type,
+						voucher_no=voucher_no,
+						voucher_detail_no=gle.voucher_detail_no,
+						against_voucher_type=against_voucher_type,
+						against_voucher_no=against_voucher_no,
+						account_currency=gle.account_currency,
+						amount=dr_or_cr,
+						amount_in_account_currency=dr_or_cr_account_currency,
+						delinked=True if cancel else False,
+						remarks=gle.remarks,
+					)
+
+					dimensions_and_defaults = get_dimensions()
+					if dimensions_and_defaults:
+						for dimension in dimensions_and_defaults[0]:
+							ple[dimension.fieldname] = gle.get(dimension.fieldname)
+
+					ple_map.append(ple)
 	return ple_map
 
 
 def create_payment_ledger_entry(
-	gl_entries, cancel=0, adv_adj=0, update_outstanding="Yes", from_repost=0, partial_cancel=False
+	gl_entries, cancel=0, adv_adj=0, update_outstanding="Yes", from_repost=0, partial_cancel=False, reconcile = False
 ):
 	if gl_entries:
-		ple_map = get_payment_ledger_entries(gl_entries, cancel=cancel)
+		ple_map = get_payment_ledger_entries(gl_entries, cancel=cancel, reconcile = reconcile)
 
 		for entry in ple_map:
 			ple = frappe.get_doc(entry)
@@ -1984,21 +2051,32 @@ class QueryPaymentLedger:
 					Table("outstanding").amount_in_account_currency >= self.max_outstanding
 				)
 
+		if self.max_outstanding:
+			if self.max_outstanding > 0:
+				filter_on_outstanding_amount.append(
+					Table("outstanding").amount_in_account_currency <= self.max_outstanding
+				)
+			else:
+				filter_on_outstanding_amount.append(
+					Table("outstanding").amount_in_account_currency >= self.max_outstanding
+				)
+
 		if self.limit and self.get_invoices:
 			outstanding_vouchers = (
 				qb.from_(ple)
 				.select(
-					ple.against_voucher_no.as_("voucher_no"),
+					ple.voucher_no.as_("voucher_no"),
 					Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
 				)
 				.where(ple.delinked == 0)
-				.where(Criterion.all(filter_on_against_voucher_no))
+				# .where(Criterion.all(filter_on_against_voucher_no))
 				.where(Criterion.all(self.common_filter))
 				.where(Criterion.all(self.dimensions_filter))
 				.where(Criterion.all(self.voucher_posting_date))
-				.groupby(ple.posting_date, ple.against_voucher_type, ple.against_voucher_no, ple.party_type, ple.party)
+				.where(ple.against_voucher_type == '')
+				.groupby(ple.posting_date,ple.voucher_no, ple.party_type, ple.party, ple.amount_in_account_currency)
 				.orderby(ple.posting_date, ple.voucher_no)
-				.having(Sum(ple.amount_in_account_currency) > 0)
+				.having(qb.Field("amount_in_account_currency") > 0)
 				.limit(self.limit)
 				.run()
 			)
@@ -2038,20 +2116,20 @@ class QueryPaymentLedger:
 			qb.from_(ple)
 			.select(
 				ple.account,
-				ple.against_voucher_type.as_("voucher_type"),
-				ple.against_voucher_no.as_("voucher_no"),
+				ple.voucher_type.as_("voucher_type"),
+				ple.voucher_no.as_("voucher_no"),
 				ple.party_type,
 				ple.party,
-				Min(ple.posting_date).as_("posting_date"),
-				Min(ple.due_date).as_("due_date"),
+				ple.posting_date,
+				ple.due_date,
 				ple.account_currency.as_("currency"),
 				Sum(ple.amount).as_("amount"),
 				Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
 			)
 			.where(ple.delinked == 0)
-			.where(Criterion.all(filter_on_against_voucher_no))
+			# .where(Criterion.all(filter_on_against_voucher_no))
 			.where(Criterion.all(self.common_filter))
-			.groupby(ple.account, ple.against_voucher_type, ple.against_voucher_no, ple.party_type,ple.party, ple.account_currency )
+			.groupby(ple.account, ple.voucher_type, ple.voucher_no, ple.party_type,ple.party, ple.account_currency, ple.posting_date, ple.due_date )
 		)
 
 		# build CTE for combining voucher amount and outstanding

@@ -114,6 +114,32 @@ class PaymentEntry(AccountsController):
 		self.make_advance_payment_ledger_entries()
 		self.update_advance_paid()  # advance_paid_status depends on the payment request amount
 		self.set_status()
+		self.create_pay_rec_records()
+
+	def create_pay_rec_records(self):
+		if(self.references):
+			pay_rec = frappe.new_doc("Payment Reconciliation Record")
+			pay_rec.company = self.company
+			
+			pay_rec.clearing_date = self.posting_date
+			pay_rec.party = self.party
+			
+			for ref in self.references:
+				pay_rec.receivable__payable_account = ref.account
+				pay_rec.party_type = "Customer" if ref.reference_doctype == "Sales Invoice" else "Supplier"
+				allocation_data = {
+					"allocated_amount": ref.allocated_amount,
+					"reference_type": self.doctype,
+					"reference_name": self.name,
+					"invoice_type": ref.reference_doctype,
+					"invoice_number": ref.reference_name,
+					"cost_center": self.cost_center
+				}
+				pay_rec.append("allocation", allocation_data)
+
+			pay_rec.flags.ignore_permissions = True
+			pay_rec.save()
+			pay_rec.submit()
 
 	def set_liability_account(self):
 		# Auto setting liability account should only be done during 'draft' status

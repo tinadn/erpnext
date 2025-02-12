@@ -767,7 +767,7 @@ class PaymentReconciliation(Document):
 		pay_rec.party_type = self.party_type
 		pay_rec.clearing_date = self.clearing_date
 		pay_rec.party = self.party
-		pay_rec.receivable_payable_account = self.receivable_payable_account
+		pay_rec.receivable__payable_account = self.default_advance_account
 		pay_rec.default_advance_account = self.default_advance_account
 
 		if self.allocation:
