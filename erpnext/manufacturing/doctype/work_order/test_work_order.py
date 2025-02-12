@@ -3774,6 +3774,318 @@ class TestWorkOrder(FrappeTestCase):
 		self.assertEqual(serial_cnt, 1)
 		self.assertEqual(wo_doc.status, "Completed")
 
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "BOM"}
+	)
+	def test_wo_without_consum_bom_TC_SCK_234(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		self.assertEqual(wo_doc.status, "Completed")
+
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "BOM"}
+	)
+	def test_wo_without_consum_bom_bth_TC_SCK_235(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+				"has_batch_no": 1,
+				"create_new_batch": 1,
+				"batch_number_series": "TBMK.#####",
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		serial_cnt = frappe.db.count('Serial and Batch Bundle',{'voucher_no':ste_doc.name, 'has_batch_no':1})
+		self.assertEqual(serial_cnt, 1)
+		self.assertEqual(wo_doc.status, "Completed")
+
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "BOM"}
+	)
+	def test_wo_without_consum_bom_bth_srl_TC_SCK_236(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+				"has_batch_no": 1,
+				"has_serial_no": 1,
+				"create_new_batch": 1,
+				"batch_number_series": "TBMK.#####",
+				"serial_no_series": "SN-TEST.#####",
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		serial_cnt = frappe.db.count('Serial and Batch Bundle',{'voucher_no':ste_doc.name, 'has_batch_no':1,'has_serial_no':1})
+		self.assertEqual(serial_cnt, 1)
+		self.assertEqual(wo_doc.status, "Completed")
+
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "Material Transferred for Manufacture"}
+	)
+	def test_wo_without_consum_manu_TC_SCK_237(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		self.assertEqual(wo_doc.status, "Completed")
+
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "Material Transferred for Manufacture"}
+	)
+	def test_wo_without_consum_manu_bth_TC_SCK_238(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+				"has_batch_no": 1,
+				"create_new_batch": 1,
+				"batch_number_series": "TBMK.#####",
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		serial_cnt = frappe.db.count('Serial and Batch Bundle',{'voucher_no':ste_doc.name, 'has_batch_no':1})
+		self.assertEqual(serial_cnt, 1)
+		self.assertEqual(wo_doc.status, "Completed")
+
+	@change_settings(
+		"Manufacturing Settings", 
+		{"backflush_raw_materials_based_on": "Material Transferred for Manufacture"}
+	)
+	def test_wo_without_consum_manu_bth_srl_tc_sck_239(self):
+		item = make_item(
+			"Test FG Item To Test Return Case",
+			{
+				"is_stock_item": 1,
+				"has_batch_no": 1,
+				"has_serial_no": 1,
+				"create_new_batch": 1,
+				"batch_number_series": "TBMK.#####",
+				"serial_no_series": "SN-TEST.#####",
+			},
+		)
+		
+		item_raw = make_item("Test raw material")
+		item_code = item.name
+		bom_doc = make_bom(
+			item=item_code,
+			source_warehouse="Stores - _TC",
+			raw_materials=[item_raw],
+			rm_qty=10
+		)
+
+		# Create a work order
+		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10)
+		wo_doc.save()
+		self.assertEqual(wo_doc.bom_no, bom_doc.name)
+
+		self.assertEqual(wo_doc.status, "Not Started")
+		# Transfer material for manufacture
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Transfer for Manufacture", 10))
+		for row in ste_doc.items:
+			test_stock_entry.make_stock_entry(
+				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
+			)
+
+		ste_doc.save()
+		ste_doc.submit()
+		ste_doc.load_from_db()
+
+		# Create a stock entry to manufacture the item
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
+		for row in ste_doc.items:
+			row.use_serial_batch_fields = 1
+
+		ste_doc.save()
+		ste_doc.submit()
+		wo_doc.load_from_db()
+		serial_cnt = frappe.db.count('Serial and Batch Bundle',{'voucher_no':ste_doc.name, 'has_batch_no':1,'has_serial_no':1})
+		self.assertEqual(serial_cnt, 1)
+		self.assertEqual(wo_doc.status, "Completed")
+
 def make_operation(**kwargs):
 	kwargs = frappe._dict(kwargs)
 
