@@ -43,6 +43,7 @@
   "section_break_jpd0",
   "auto_reconcile_payments",
   "stale_days",
+  "exchange_gain_loss_posting_date",
   "invoicing_settings_tab",
   "accounts_transactions_settings_section",
   "over_billing_allowance",
@@ -365,7 +366,7 @@
   {
    "fieldname": "section_break_jpd0",
    "fieldtype": "Section Break",
-   "label": "Payment Reconciliations"
+   "label": "Payment Reconciliation Settings"
   },
   {
    "default": "0",
@@ -460,6 +461,14 @@
    "fieldname": "ignore_is_opening_check_for_reporting",
    "fieldtype": "Check",
    "label": "Ignore Is Opening check for reporting"
+  },
+  {
+   "default": "Payment",
+   "description": "Only applies for Normal Payments",
+   "fieldname": "exchange_gain_loss_posting_date",
+   "fieldtype": "Select",
+   "label": "Posting Date Inheritance for Exchange Gain / Loss",
+   "options": "Invoice\nPayment\nReconciliation Date"
   },
   {
    "default": "1",

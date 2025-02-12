@@ -71,12 +71,14 @@ def make_item(item_code=None, properties=None, uoms=None, barcode=None):
 			},
 		)
 	if 'india_compliance' in frappe.get_installed_apps():
-		gst_hsn_code = random.choice(frappe.db.get_all("GST HSN Code", pluck = 'name'))
-		if not frappe.db.exists("GST HSN Code", gst_hsn_code):
-			gst_hsn_code = frappe.new_doc("GST HSN Code")
-			gst_hsn_code.hsn_code = "11112222"
-			gst_hsn_code.save()
-		item.gst_hsn_code = gst_hsn_code
+		from india_compliance.gst_india.utils import get_hsn_settings
+		valid_hsn_length = get_hsn_settings()
+
+		gst_hsn_code = frappe.db.get_all("GST HSN Code", pluck = "name")
+		for code in gst_hsn_code:
+			if len(code) in valid_hsn_length[1]:
+				item.gst_hsn_code = code
+				break
 	item.insert()
 
 	return item
@@ -908,6 +910,79 @@ class TestItem(FrappeTestCase):
 		)
 
 		self.assertRaises(frappe.ValidationError, item_doc.save)
+
+	def test_cr_item_TC_SCK_128(self):
+		from frappe.utils import random_string
+		item_fields1 = {
+			"item_name": f"_Test-{random_string(5)}",
+			"valuation_rate": 100,
+			"has_batch_no": 1,
+			"has_expiry_date": 1,
+			"shelf_life_in_days": 30
+		}
+		item = make_item(item_fields1["item_name"], item_fields1)
+		self.assertEqual(item.has_batch_no, 1)
+		self.assertEqual(item.has_expiry_date, 1)
+		self.assertEqual(item.shelf_life_in_days, 30)
+
+	def test_cr_item_TC_SCK_129(self):
+		from frappe.utils import random_string
+		item_fields1 = {
+			"item_name": f"_Test-{random_string(5)}",
+			"valuation_rate": 100,
+			"has_serial_no": 1,
+			"has_expiry_date": 1,
+			"shelf_life_in_days": 30
+		}
+		item = make_item(item_fields1["item_name"], item_fields1)
+		self.assertEqual(item.has_serial_no, 1)
+		self.assertEqual(item.has_expiry_date, 1)
+		self.assertEqual(item.shelf_life_in_days, 30)
+
+	def test_cr_item_TC_SCK_130(self):
+		from frappe.utils import random_string
+		item_fields1 = {
+			"item_name": f"_Test-{random_string(5)}",
+			"is_stock_item": 0,
+			"valuation_rate": 100,
+			"shelf_life_in_days": 30
+		}
+		item = make_item(item_fields1["item_name"], item_fields1)
+		self.assertEqual(item.is_stock_item, 0)
+		self.assertEqual(item.shelf_life_in_days, 30)
+
+	def test_item_cr_TC_SCK_153(self):
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		item_fields = {
+			"item_name": "Ball point Pen1",
+			"is_stock_item": 1,
+			"stock_uom": "Box",
+			"item_defaults": [{'company': "_Test Company", 'default_warehouse': create_warehouse("Stores-test", properties=None, company="_Test Company")}],
+		}
+		item = make_item("Ball point Pen1", item_fields)
+		self.assertEqual(item.name, "Ball point Pen1")
+
+	def test_item_group_cr_TC_SCK_154(self):
+		parent_itm_grp = frappe.new_doc("Item Group")
+		parent_itm_grp.item_group_name = "Test Parent Item Group"
+		parent_itm_grp.is_group = 1
+		parent_itm_grp.insert()
+		itm_grp = frappe.new_doc("Item Group")
+		itm_grp.item_group_name = "Test Item Group"
+		itm_grp.parent_item_group = "Test Parent Item Group"
+		itm_grp.insert()
+		self.assertEqual(itm_grp.name, "Test Item Group")
+		self.assertEqual(itm_grp.parent_item_group, "Test Parent Item Group")
+
+	def tearDown(self):
+        # Cleanup created price lists
+		if frappe.db.exists("Item Group", 'Software'):
+			frappe.delete_doc("Item Group", 'Software')
 
 
 def set_item_variant_settings(fields):

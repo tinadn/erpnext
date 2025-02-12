@@ -2172,6 +2172,7 @@ def create_account():
 		{"name": "Current Liabilities", "parent": "Source of Funds (Liabilities) - _TC"},
 		{"name": "Duties and Taxes", "parent": "Current Liabilities - _TC"},
 		{"name": "_Test TDS Payable", "parent": "Duties and Taxes - _TC","account_type":"Tax"},
+		{"name": "_Test TCS Payable", "parent": "Duties and Taxes - _TC","account_type":"Tax"},
 		{"name": "_Test Creditors", "parent": "Accounts Payable - _TC","account_type":"Payable"},
 		{"name": "_Test Payable USD", "parent": "Accounts Payable - _TC","account_type":"Payable"},
 		{"name": "_Test Cash", "parent": "Cash In Hand - _TC"},

@@ -5893,7 +5893,32 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 			error_message = str(e)
 			self.assertEqual(error_message, f"Cannot delete or cancel because Sales Order {so.name} is linked with Payment Entry {pe.name} at Row: 1")
 		
-
+	def test_customer_credit_limit_bypass_TC_ACC_139(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+  
+		account_setting = frappe.get_doc("Accounts Settings")
+		account_setting.credit_controller="Sales Manager"
+		account_setting.save()
+		custeomer = frappe.get_doc("Customer", "_Test Customer")
+		if len(custeomer.credit_limits) == 0: 
+			custeomer.append("credit_limits", {"company": "_Test Company", "credit_limit": 1000})
+			custeomer.save()
+			frappe.db.commit()
+		item = make_test_item("_Test Item")
+		
+		sales_order = make_sales_order(
+			customer="_Test Customer",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1100,
+			do_not_submit=True
+		)
+		sales_order.load_from_db()
+	
+		self.assertRaises(frappe.ValidationError, sales_order.submit)
+	
+      
 def get_transport_details(customer):
 	# create a driver
 	driver = frappe.new_doc("Driver")

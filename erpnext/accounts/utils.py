@@ -1563,10 +1563,12 @@ def get_voucherwise_gl_entries(future_stock_vouchers, posting_date):
 
 	gles = frappe.db.sql(
 		"""
-		select name, account, credit, debit, cost_center, project, voucher_type, voucher_no
+		select name, account, credit, debit, cost_center{}, voucher_type, voucher_no
 			from `tabGL Entry`
 		where
-			posting_date >= {} and voucher_no in ({})""".format("%s", ", ".join(["%s"] * len(voucher_nos))),
+			posting_date >= {} and voucher_no in ({})
+   		""".format(", project" if "projects" in frappe.get_installed_apps() else "",
+                	"%s",", ".join(["%s"] * len(voucher_nos))),
 		tuple([posting_date, *voucher_nos]),
 		as_dict=1,
 	)
@@ -1667,7 +1669,7 @@ def get_stock_and_account_balance(account=None, posting_date=None, company=None)
 			if wh_details.account == account and not wh_details.is_group
 		]
 
-	total_stock_value = get_stock_value_on(related_warehouses, posting_date)
+	total_stock_value = get_stock_value_on(related_warehouses, posting_date, company=company)
 
 	precision = frappe.get_precision("Journal Entry Account", "debit_in_account_currency")
 	return flt(account_balance, precision), flt(total_stock_value, precision), related_warehouses

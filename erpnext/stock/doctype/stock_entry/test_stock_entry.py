@@ -20,6 +20,7 @@ from erpnext.stock.doctype.serial_and_batch_bundle.test_serial_and_batch_bundle 
 )
 from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 from erpnext.stock.doctype.material_request.test_material_request import get_gle, make_material_request
+from erpnext.stock.doctype.material_request.material_request import make_stock_entry as make_mr_se
 from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
 from erpnext.stock.doctype.serial_no.serial_no import *
 from erpnext.stock.doctype.stock_entry.stock_entry import FinishedGoodError, make_stock_in_entry
@@ -1986,6 +1987,204 @@ class TestStockEntry(FrappeTestCase):
 		self.assertEqual(warehouse_qty["_Test Target Warehouse - _TC"], 0)
 		self.assertEqual(warehouse_qty["_Test Warehouse - _TC"], 0)
 
+	def test_create_stock_entry_TC_SCK_231(self):
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		# Create test item
+		item_fields = {
+			"item_name": "Test Pen",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+		}
+		item = make_item("Test Pen", item_fields)
+		parent_acc = frappe.get_doc({
+			"doctype": "Account",
+			"account_name": "Current Assets - _TC",
+			"account_type": "Fixed Asset",
+			"parent_account": "_Test Account Tax Assets - _TC",
+			"root_type": "Asset",
+			"is_group": 1,
+			"company": "_Test Company"
+		})
+		parent_acc.save()
+		asset_account = frappe.get_doc({
+			"doctype": "Account",
+			"account_name": "Stock Adjustment - _TC",
+			"account_type": "Fixed Asset",
+			"parent_account": "Current Assets - _TC",
+			"company": "_Test Company"
+		})
+		asset_account.save()
+		# item = make_test_objects("Item", {"item_code": "Test Pen", "item_name": "Test Pen"})
+
+		# Set stock entry details
+		stock_entry_type = "Material Receipt"
+		posting_date = "2025-01-10"
+		target_warehouse = create_warehouse("Stores-test", properties=None, company="_Test Company")
+		item_code = item.name
+		qty = 5
+
+		# Create stock entry
+		se = make_stock_entry(
+			item_code=item_code, 
+			company = "_Test Company", 
+			purpose=stock_entry_type, 
+			expense_account= asset_account.name,
+			qty=qty,
+			do_not_submit=True,
+			do_not_save=True
+		)
+		se.items[0].t_warehouse = target_warehouse
+		se.items[0].is_opening = "Yes"
+		se.save()
+		se.submit()
+
+		# Assert opening balance
+		bin = frappe.get_doc("Bin", {"item_code": item_code, "warehouse": target_warehouse})
+		self.assertEqual(bin.actual_qty, qty)
+
+		# Tear down
+		# frappe.delete_doc("Stock Entry", se.name)
+		# frappe.delete_doc("Item", item.name)
+
+	def test_stock_reco_TC_SCK_232(self):
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		item_fields = {
+			"item_name": "Test CPU",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+		}
+		self.warehouse = create_warehouse("Stores", properties=None, company="_Test Company")
+		self.company = "_Test Company"
+		self.item_code = make_item("Test CPU", item_fields).name
+		from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import (
+			create_stock_reconciliation,
+		)
+		sr = create_stock_reconciliation(purpose="Opening Stock",expense_account="Temporary Opening - _TC",item_code=self.item_code, warehouse=self.warehouse, qty=5, rate=500)
+		sr.submit()
+		reserved_qty = frappe.db.get_value("Bin", {"item_code": self.item_code, "warehouse": self.warehouse}, "actual_qty")
+		self.assertEqual(reserved_qty, 5)
+
+	def test_stock_ent_TC_SCK_233(self):
+		from erpnext.stock.utils import get_bin
+		warehouse = create_warehouse("Stores-test", properties=None, company="_Test Company")
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		item_fields = {
+			"item_name": "Test 1231",
+			"is_stock_item": 1,
+			"valuation_rate": 100,
+			"stock_uom": "Nos",
+			"gst_hsn_code": "01011010",
+			"opening_stock": 5,
+			"item_defaults": [{'company': "_Test Company", 'default_warehouse': warehouse}],
+		}
+		self.item_code = make_item("Test 1231", item_fields)
+		bin = get_bin(self.item_code.name, warehouse)
+		
+		self.assertEqual(bin.actual_qty, item_fields["opening_stock"])
+
+	def test_stock_reco_TC_SCK_127(self):
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		self.source_warehouse = create_warehouse("Stores-test", properties=None, company="_Test Company")
+		self.target_warehouse = create_warehouse("Department Stores-test", properties=None, company="_Test Company")
+		item_fields1 = {
+			"item_name": "Test Brown Rice",
+			"is_stock_item": 1,
+			"valuation_rate": 100,
+			"stock_uom": "Kg",
+		}
+		self.item_code1 = make_item("Test Brown Rice", item_fields1)
+		item_fields2 = {
+			"item_name": "Test Brown Rice 5kg",
+			"is_stock_item": 1,
+			"valuation_rate": 100,
+			"stock_uom": "Kg",
+		}
+		self.item_code2 = make_item("Test Brown Rice 5kg", item_fields2)
+		item_fields3 = {
+			"item_name": "Test Brown Rice 500g",
+			"is_stock_item": 1,
+			"valuation_rate": 100,
+			"stock_uom": "Kg",
+		}
+		self.item_code3 = make_item("Test Brown Rice 500g", item_fields3)
+		se1 = make_stock_entry(
+			item_code=self.item_code1.name, 
+			company = "_Test Company", 
+			purpose="Material Receipt", 
+			qty=10,
+			do_not_submit=True,
+			do_not_save=True
+		)
+		se1.items[0].t_warehouse = self.source_warehouse
+		se1.save()
+		se1.submit()
+
+		self.material_request = frappe.get_doc({
+            "doctype": "Material Request",
+            "material_request_type": "Material Transfer",
+			"set_from_warehouse": self.source_warehouse,
+			"set_warehouse": self.target_warehouse,
+			"company": "_Test Company",
+            "items": [
+                {"item_code": self.item_code1.name, "qty": 10, "schedule_date": frappe.utils.nowdate()},
+                {"item_code": self.item_code3.name, "qty": 10, "schedule_date": frappe.utils.nowdate()},
+                {"item_code": self.item_code2.name, "qty": 2, "schedule_date": frappe.utils.nowdate()},
+            ]
+        })
+		self.material_request.insert()
+		self.material_request.submit()
+
+		se = frappe.get_doc({
+            "doctype": "Stock Entry",
+            "stock_entry_type": "Repack",
+            "company": "_Test Company",
+            "items": []
+        })
+		se.append("items", {
+			"item_code": self.item_code1.name,
+			"qty": 10,
+			"s_warehouse": self.source_warehouse
+		})
+		se.append("items", {
+			"item_code": self.item_code3.name,
+			"qty": 10,  # Fixed the qty
+			"t_warehouse": self.target_warehouse
+		})
+		se.append("items", {
+			"item_code": self.item_code2.name,
+			"qty": 2,  # Fixed the qty
+			"t_warehouse": self.target_warehouse
+		})
+		se.save()
+		se.submit()
+		stock_ledger_entries = frappe.get_all(
+            "Stock Ledger Entry",
+            filters={"voucher_no": se.name},
+            fields=["item_code", "actual_qty"]
+        )
+
+		stock_movements = {s["item_code"]: s["actual_qty"] for s in stock_ledger_entries}
+
+		self.assertEqual(stock_movements.get(self.item_code1.name), -10, "Brown Rice should be 10 Outward")
+		self.assertEqual(stock_movements.get(self.item_code3.name), 10, "Brown Rice 500g should be 10 Inward")
+		self.assertEqual(stock_movements.get(self.item_code2.name), 2, "Brown Rice 5kg should be 2 Inward")
+
 	def create_stock_repack_via_bom_TC_SCK_016(self):
 		t_warehouse = create_warehouse(
 			warehouse_name="_Test Target Warehouse",
@@ -2077,8 +2276,616 @@ class TestStockEntry(FrappeTestCase):
 		)
 
 		return se
+	
+	def test_partial_material_issue_TC_SCK_204(self):
+		company="_Test Company"
+		# item_code = "_Test Item"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life":"2099-12-31",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####",
+			"valuation_rate": 100,
+		}
+		# if if_app_installed("india_compliance"):
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
 
+		item_code = make_item("COOKIES (BT)", fields).name
 
+		source_warehouse = "Stores - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			# purpose="Material Receipt",
+			company=company,
+		)
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Issue",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.s_warehouse = target_warehouse,
+		se1.t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+	def test_stock_enrty_with_batch_TC_SCK_076(self):
+		fields = {
+			"is_stock_item": 1, 
+			"has_batch_no":1,
+			"create_new_batch":1,
+			"batch_number_series":"ABC.##"
+
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item = make_item("_Test Batch Item", properties=fields).name
+		se = make_stock_entry(item_code=item, qty=10, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt")
+
+		batch = frappe.get_all('Batch',filters={'item': item,"reference_name":se.name},fields=['name',"batch_qty",'item',"reference_name"])
+		
+		self.assertEqual(len(batch), 1)
+		self.assertEqual(batch[0]['item'], item)
+		self.assertEqual(batch[0]['batch_qty'], 10)
+		self.assertEqual(batch[0]['reference_name'], se.name)
+
+	def test_stock_enrty_with_serial_and_batch_TC_SCK_077(self):
+		fields = {
+			"is_stock_item": 1, 
+			"has_batch_no":1,
+			"create_new_batch":1,
+			"batch_number_series":"ABC.##",
+			"has_serial_no":1,
+			"serial_no_series":"AAB.##"
+
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item = make_item("_Test Batch Item", properties=fields).name
+		se = make_stock_entry(item_code=item, qty=5, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt")
+
+		batch = frappe.get_all('Batch',filters={'item': item,"reference_name":se.name},fields=['name',"batch_qty",'item',"reference_name"])
+
+		serial_no = frappe.get_all('Serial No',filters={'item_code': item,"purchase_document_no":se.name},fields=['name',"batch_no",'item_code',"purchase_document_no"])
+
+		
+		self.assertEqual(len(batch), 1)
+		self.assertEqual(batch[0]['item'], item)
+		self.assertEqual(batch[0]['batch_qty'], 5)
+		self.assertEqual(batch[0]['reference_name'], se.name)
+
+		self.assertEqual(len(serial_no), 5, "Serial number count mismatch")
+		for serial in serial_no:
+			self.assertEqual(serial['item_code'], item)
+			self.assertEqual(serial['purchase_document_no'], se.name)
+			self.assertEqual(serial['batch_no'], batch[0]['name'])
+
+	def test_stock_entry_for_multiple_items_with_serial_batch_no_TC_SCK_078(self):
+		fields = {
+			"is_stock_item": 1, 
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"batch_number_series": "ABC.##",
+			"has_serial_no": 1,
+			"serial_no_series": "AAB.##"
+		}
+
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_1 = make_item("_Test Batch Item 1", properties=fields).name
+		item_2 = make_item("_Test Batch Item 2", properties=fields).name
+
+		se = make_stock_entry(
+			item_code=item_1, qty=5, rate=100, target="_Test Warehouse - _TC",
+			purpose="Material Receipt", do_not_save=True
+		)
+
+		se.append("items", {
+			"item_code": item_2,
+			"qty": 5,
+			"basic_rate": 150,
+			"t_warehouse": "_Test Warehouse - _TC"
+		})
+
+		se.save()
+		se.submit()
+
+		for item, expected_qty in [(item_1, 5), (item_2, 5)]:
+			batch = frappe.get_all(
+				'Batch',
+				filters={'item': item, "reference_name": se.name},
+				fields=['name', "batch_qty", 'item', "reference_name"]
+			)
+
+			serial_no = frappe.get_all(
+				'Serial No',
+				filters={'item_code': item, "purchase_document_no": se.name},
+				fields=['name', "batch_no", 'item_code', "purchase_document_no"]
+			)
+
+			self.assertEqual(len(batch), 1, f"Batch record mismatch for {item}")
+			self.assertEqual(batch[0]['item'], item)
+			self.assertEqual(batch[0]['batch_qty'], expected_qty)
+			self.assertEqual(batch[0]['reference_name'], se.name)
+
+			self.assertEqual(len(serial_no), expected_qty, f"Serial number count mismatch for {item}")
+			for serial in serial_no:
+				self.assertEqual(serial['item_code'], item)
+				self.assertEqual(serial['purchase_document_no'], se.name)
+				self.assertEqual(serial['batch_no'], batch[0]['name'])
+
+	def test_stock_entry_tc_sck_136(self):
+		item_code = make_item("_Test Item Stock Entry New", {"valuation_rate": 100})
+
+		se = make_stock_entry(item_code=item_code, target="_Test Warehouse - _TC", qty=1, do_not_submit=True)
+		se.stock_entry_type = "Manufacture"
+		se.items[0].is_finished_item = 1
+		se.submit()
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':se.name})
+		self.assertEqual(sle.qty_after_transaction, 1)
+
+		self.assertEqual(se1.stock_entry_type, "Material Issue")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Ordered")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, target_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 0.0, 500.0],
+					[cogs_account, 500.0, 0.0],
+				]
+			),
+		)
+	def test_partial_material_issue_TC_SCK_205(self):
+		company="_Test Company"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life": "2099-12-31",
+			"is_stock_item": 1,
+			"has_serial_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"serial_no_series": "Test-SL-SN.#####",
+			"valuation_rate": 100,
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_code = make_item("COOKIES (SL)", fields).name
+
+		source_warehouse = "Department Store - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			company=company,
+		)
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Issue",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.s_warehouse = target_warehouse
+		se1.t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+		self.assertEqual(se1.stock_entry_type, "Material Issue")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Ordered")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, target_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 0.0, 500.0],
+					[cogs_account, 500.0, 0.0],
+				]
+			),
+		)
+	def test_partial_material_issue_TC_SCK_206(self):
+		company="_Test Company"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life": "2099-12-31",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####",
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SL-SN.#####",
+			"valuation_rate": 100,
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_code = make_item("COOKIES (BT-SL)", fields).name
+
+		source_warehouse = "Stores - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			company=company,
+		)
+
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Issue",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+			posting_date="2024-12-19",
+			required_by_date="2024-12-20",
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.s_warehouse = target_warehouse
+		se1.t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+		self.assertEqual(se1.stock_entry_type, "Material Issue")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Ordered")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, target_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 0.0, 500.0],
+					[cogs_account, 500.0, 0.0],
+				]
+			),
+		)
+	def test_partial_material_transfer_TC_SCK_207(self):
+		company = "_Test Company"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life": "2099-12-31",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####",
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SL-SN.#####",
+			"valuation_rate": 100,
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_code = make_item("COOKIES (BT-SL)", fields).name
+
+		source_warehouse = "Stores - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC","account":"Cost of Goods Sold - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			company=company,
+		)
+
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Transfer",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+			posting_date="2024-12-19",
+			required_by_date="2024-12-20",
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.from_warehouse = target_warehouse
+		se1.items[0].t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+		self.assertEqual(se1.stock_entry_type, "Material Transfer")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Received")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, source_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 500.0, 0.0],
+					[cogs_account, 0.0, 500.0],
+				]
+			),
+		)
+	def test_partial_material_transfer_TC_SCK_208(self):
+		company = "_Test Company"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life": "2099-12-31",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####",
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SL-SN.#####",
+			"valuation_rate": 100,
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_code = make_item("COOKIES (BT-SL)", fields).name
+
+		source_warehouse = "Stores - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC", "account": "Cost of Goods Sold - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			company=company,
+		)
+
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Transfer",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+			posting_date="2024-12-19",
+			required_by_date="2024-12-20",
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.from_warehouse = target_warehouse
+		se1.items[0].t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+		self.assertEqual(se1.stock_entry_type, "Material Transfer")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Received")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, source_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 500.0, 0.0],
+					[cogs_account, 0.0, 500.0],
+				]
+			),
+		)
+	def test_partial_material_transfer_TC_SCK_209(self):
+		company = "_Test Company"
+		fields = {
+			"shelf_life_in_days": 365,
+			"end_of_life": "2099-12-31",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####",
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SL-SN.#####",
+			"valuation_rate": 100,
+		}
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item_code = make_item("COOKIES (BT-SL)", fields).name
+
+		source_warehouse = "Stores - _TC"
+		target_warehouse = create_warehouse(
+			warehouse_name="Department Store",
+			properties={"parent_warehouse": "All Warehouses - _TC", "account": "Cost of Goods Sold - _TC"},
+			company=company,
+		)
+		qty = 10
+
+		# Stock Receipt
+		se_receipt = make_stock_entry(
+			item_code=item_code,
+			qty=qty,
+			to_warehouse=target_warehouse,
+			company=company,
+		)
+
+		# Create Material Request
+		mr = make_material_request(
+			material_request_type="Material Transfer",
+			qty=qty,
+			warehouse=target_warehouse,
+			item_code=item_code,
+			company=company,
+			posting_date="2024-12-19",
+			required_by_date="2024-12-20",
+		)
+		self.assertEqual(mr.status, "Pending")
+
+		se1 = make_mr_se(mr.name)
+		se1.company = company
+		se1.items[0].qty = 5
+		se1.from_warehouse = target_warehouse
+		se1.items[0].t_warehouse = source_warehouse
+		se1.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se1.insert()
+		se1.submit()
+
+		self.assertEqual(se1.stock_entry_type, "Material Transfer")
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Received")
+
+		# Check Stock Ledger Entries
+		self.check_stock_ledger_entries(
+			"Stock Entry",
+			se1.name,
+			[
+				[item_code, target_warehouse, -5],
+				[item_code, source_warehouse, 5],
+			],
+		)
+
+		# Check GL Entries
+		stock_in_hand_account = get_inventory_account(company, source_warehouse)
+		cogs_account = "Cost of Goods Sold - _TC"
+		self.check_gl_entries(
+			"Stock Entry",
+			se1.name,
+			sorted(
+				[
+					[stock_in_hand_account, 500.0, 0.0],
+					[cogs_account, 0.0, 500.0],
+				]
+			),
+		)
 def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
 		bom = frappe.new_doc("BOM")
 		bom.update(

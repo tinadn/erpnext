@@ -1982,7 +1982,8 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
 		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
 		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+		debit_act = frappe.db.get_value("Company",pr.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': debit_act},'credit')
 		self.assertEqual(gl_temp_credit, 500)
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
@@ -1999,7 +2000,8 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
 		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
 		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+		debit_act = frappe.db.get_value("Company",pr.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': debit_act},'credit')
 		self.assertEqual(gl_temp_credit, 500)
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
@@ -2425,7 +2427,8 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sle.qty_after_transaction, bin_qty + 10)
 		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
 		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+		debit_act = frappe.db.get_value("Company",pr.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': debit_act},'credit')
 		self.assertEqual(gl_temp_credit, 1000)
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
@@ -2850,7 +2853,8 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
 		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
 		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+		debit_act = frappe.db.get_value("Company",pr.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': debit_act},'credit')
 		self.assertEqual(gl_temp_credit, 500)
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
@@ -2867,7 +2871,8 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
 		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
 		
-		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+		debit_act = frappe.db.get_value("Company",pr.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': debit_act},'credit')
 		self.assertEqual(gl_temp_credit, 500)
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
@@ -2998,6 +3003,7 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(cogs_gle[0], cogs_gle[1])
 		self.assertEqual(current_bin_qty, bin_qty)
 
+	@change_settings("Stock Settings",{"allow_negative_stock": 1})
 	def test_mr_transfer_to_se_cancel_TC_SCK_061(self):
 		source_wh = create_warehouse(
 			warehouse_name="_Test Source Warehouse",
@@ -4119,18 +4125,21 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(doc_mr.status, "Received")
 		doc_pr.load_from_db()
 		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		warehouse_rej = create_warehouse("_Test warehouse Rejected", company="_Test Company")
 		return_pi = make_return_doc("Purchase Receipt", doc_pr.name)
+		return_pi.get("items")[0].qty = -5
 		return_pi.get("items")[0].rejected_qty = -5
+		return_pi.get("items")[0].rejected_warehouse = warehouse_rej
 		return_pi.submit()
 
 		#if account setup in company
 		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
-			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': 'Stock Received But Not Billed - _TC'},'debit')
 			self.assertEqual(gl_temp_credit, 500)
 		
 		#if account setup in company
 		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
-			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': 'Stock In Hand - _TC'},'debit')
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': 'Stock In Hand - _TC'},'credit')
 			self.assertEqual(gl_stock_debit, 500)
 
 	def test_mr_po_2pr_partial_return_TC_SCK_041(self):
@@ -6518,6 +6527,773 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sh_gle[0], sh_gle[1])
 		self.assertEqual(cogs_gle[0], cogs_gle[1])
 		self.assertEqual(current_bin_qty, bin_qty)
+
+	def test_create_mr_po_pr_serl_part_retn_tc_sck_210(self):
+		create_company()
+		create_fiscal_year()
+		company = "_Test Company MR"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
+		supplier = create_supplier(supplier_name="_Test Supplier MR")
+		item_code = "_Test Item With Serial No"
+
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"item_group": "_Test Item Group",
+				"default_warehouse": warehouse,
+				"company": company,
+				"has_serial_no": 1
+			})
+			if 'india_compliance' in frappe.get_installed_apps():
+				from india_compliance.gst_india.utils import get_hsn_settings
+				valid_hsn_length = get_hsn_settings()
+
+				gst_hsn_code = frappe.db.get_all("GST HSN Code", pluck = "name")
+				for code in gst_hsn_code:
+					if len(code) in valid_hsn_length[1]:
+						item.gst_hsn_code = code
+						break
+			item.insert()
+		mr = make_material_request(item_code=item_code)
+		
+		#partially qty
+		po = make_purchase_order(mr.name)
+		po.supplier = supplier
+		po.get("items")[0].rate = 100
+		po.get("items")[0].qty = 10
+		po.insert()
+		po.submit()
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty") or 0
+		pr1 = make_purchase_receipt(po.name)
+		serial_numbers = [f"test_item11_00{i}" for i in range(1, 10 + 1)]
+		pr1.items[0].serial_no = "\n".join(serial_numbers)
+		pr1.insert()
+		pr1.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr1.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 10)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 1000)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 1000)
+
+		pr1.load_from_db()
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		return_pi1 = make_return_doc("Purchase Receipt", pr1.name)
+
+		serial_numbers = [f"test_item13_00{i}" for i in range(1, 5 + 1)]
+		return_pi1.items[0].serial_no = "\n".join(serial_numbers)
+		return_pi1.get("items")[0].received_qty = -5
+		return_pi1.get("items")[0].qty = -5
+		return_pi1.submit()
+		
+		debit_act = frappe.db.get_value("Company",return_pi1.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': debit_act},'debit')
+		self.assertEqual(gl_temp_credit, 500)
+		
+		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': 'Stock In Hand - _TC'},'credit')
+		self.assertEqual(gl_stock_debit, 500)
+
+	def test_create_mr_po_2pr_serial_part_return_tc_sck_211(self):
+		create_company()
+		create_fiscal_year()
+		company = "_Test Company MR"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
+		supplier = create_supplier(supplier_name="_Test Supplier MR")
+		item_code = "_Test Item With Serial No"
+		quantity = 3
+
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"item_group": "_Test Item Group",
+				"default_warehouse": warehouse,
+				"company": company,
+				"has_serial_no": 1
+			})
+			if 'india_compliance' in frappe.get_installed_apps():
+				gst_hsn_code = "11112222"
+				if not frappe.db.exists("GST HSN Code", gst_hsn_code):
+					gst_hsn_code = frappe.new_doc("GST HSN Code")
+					gst_hsn_code.hsn_code = "11112222"
+					gst_hsn_code.save()
+				item.gst_hsn_code = gst_hsn_code
+			item.insert()
+		mr = make_material_request(item_code=item_code)
+		
+		po = make_purchase_order(mr.name)
+		po.supplier = supplier
+		po.get("items")[0].rate = 100
+		po.get("items")[0].qty = 10
+		po.insert()
+		po.submit()
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty") or 0
+		pr = make_purchase_receipt(po.name)
+		serial_numbers = [f"test_item1_00{i}" for i in range(1, 5 + 1)]
+		pr.items[0].serial_no = "\n".join(serial_numbers)
+		pr.items[0].qty = 5
+		pr.insert()
+		pr.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 500)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 500)
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
+		pr1 = make_purchase_receipt(po.name)
+		serial_numbers = [f"test_item2_00{i}" for i in range(1, 5 + 1)]
+		pr1.items[0].serial_no = "\n".join(serial_numbers)
+		pr1.insert()
+		pr1.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr1.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 500)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 500)
+
+		pr1.load_from_db()
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		return_pi1 = make_return_doc("Purchase Receipt", pr1.name)
+		return_pi1.submit()
+		
+		debit_act = frappe.db.get_value("Company",return_pi1.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': debit_act},'debit')
+		self.assertEqual(gl_temp_credit, 500)
+		
+		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': 'Stock In Hand - _TC'},'credit')
+		self.assertEqual(gl_stock_debit, 500)
+
+	def test_mr_2po_2pr_serl_part_retn_tc_sck_212(self):
+		create_company()
+		create_fiscal_year()
+		company = "_Test Company MR"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
+		supplier = create_supplier(supplier_name="_Test Supplier MR")
+		item_code = "_Test Item With Serial No"
+		quantity = 3
+
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"item_group": "_Test Item Group",
+				"default_warehouse": warehouse,
+				"company": company,
+				"has_serial_no": 1
+			})
+			if 'india_compliance' in frappe.get_installed_apps():
+				gst_hsn_code = "11112222"
+				if not frappe.db.exists("GST HSN Code", gst_hsn_code):
+					gst_hsn_code = frappe.new_doc("GST HSN Code")
+					gst_hsn_code.hsn_code = "11112222"
+					gst_hsn_code.save()
+				item.gst_hsn_code = gst_hsn_code
+			item.insert()
+		mr = make_material_request(item_code=item_code)
+		
+		#partially qty
+		po = make_purchase_order(mr.name)
+		po.supplier = supplier
+		po.get("items")[0].rate = 100
+		po.get("items")[0].qty = 5
+		po.insert()
+		po.submit()
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty") or 0
+		pr = make_purchase_receipt(po.name)
+		serial_numbers = [f"test_item_00{i}" for i in range(1, int(po.get("items")[0].qty) + 1)]
+		pr.items[0].serial_no = "\n".join(serial_numbers)
+		pr.insert()
+		pr.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 500)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 500)
+
+		pr.load_from_db()
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		return_pi = make_return_doc("Purchase Receipt", pr.name)
+		return_pi.submit()
+		
+		debit_act = frappe.db.get_value("Company",return_pi.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': debit_act},'debit')
+		self.assertEqual(gl_temp_credit, 500)
+		
+		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': 'Stock In Hand - _TC'},'credit')
+		self.assertEqual(gl_stock_debit, 500)
+
+		#remaining qty
+		po1 = make_purchase_order(mr.name)
+		po1.supplier = "_Test Supplier"
+		po1.get("items")[0].rate = 100
+		po1.get("items")[0].qty = 5
+		po1.insert()
+		po1.submit()
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty")
+		pr1 = make_purchase_receipt(po1.name)
+		serial_numbers = [f"test_item1_00{i}" for i in range(1, int(po1.get("items")[0].qty) + 1)]
+		pr1.items[0].serial_no = "\n".join(serial_numbers)
+		pr1.insert()
+		pr1.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr1.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 5)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 500)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 500)
+
+	def test_create_mr_to_2po_to_1pr_serl_part_retn_tc_sck_213(self):
+		create_company()
+		create_fiscal_year()
+		company = "_Test Company MR"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
+		supplier = create_supplier(supplier_name="_Test Supplier MR")
+		item_code = "_Test Item With Serial No"
+
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"item_group": "_Test Item Group",
+				"default_warehouse": warehouse,
+				"company": company,
+				"has_serial_no": 1
+			})
+			if 'india_compliance' in frappe.get_installed_apps():
+				gst_hsn_code = "11112222"
+				if not frappe.db.exists("GST HSN Code", gst_hsn_code):
+					gst_hsn_code = frappe.new_doc("GST HSN Code")
+					gst_hsn_code.hsn_code = "11112222"
+					gst_hsn_code.save()
+				item.gst_hsn_code = gst_hsn_code
+			item.insert()
+		mr = make_material_request(item_code=item_code)
+		
+		#partially qty
+		po = make_purchase_order(mr.name)
+		po.supplier = "_Test Supplier"
+		po.get("items")[0].rate = 100
+		po.get("items")[0].qty = 5
+		po.insert()
+		po.submit()
+
+		#remaining qty
+		po1 = make_purchase_order(mr.name)
+		po1.supplier = "_Test Supplier"
+		po1.get("items")[0].rate = 100
+		po1.get("items")[0].qty = 5
+		po1.insert()
+		po1.submit()
+
+		bin_qty = frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": "_Test Warehouse - _TC"}, "actual_qty") or 0
+		pr1 = make_purchase_receipt(po.name)
+		pr1 = make_purchase_receipt(po1.name, target_doc=pr1)
+		serial_numbers = [f"test_item11_00{i}" for i in range(1, 5 + 1)]
+		pr1.items[0].serial_no = "\n".join(serial_numbers)
+		serial_numbers1 = [f"test_item12_00{i}" for i in range(1, 5 + 1)]
+		pr1.items[1].serial_no = "\n".join(serial_numbers1)
+		pr1.insert()
+		pr1.submit()
+		
+		sle = frappe.get_doc('Stock Ledger Entry',{'voucher_no':pr1.name})
+		self.assertEqual(sle.qty_after_transaction, bin_qty + 10)
+		self.assertEqual(sle.warehouse, mr.get("items")[0].warehouse)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock Received But Not Billed - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock Received But Not Billed - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 1000)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr1.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 1000)
+
+		pr1.load_from_db()
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+		return_pi1 = make_return_doc("Purchase Receipt", pr1.name)
+		return_pi1.items = return_pi1.items[1:]
+		return_pi1.items[0].received_qty = -5
+		return_pi1.items[0].qty = -5
+		serial_numbers = [f"test_item13_00{i}" for i in range(1, 5 + 1)]
+		return_pi1.items[0].serial_no = "\n".join(serial_numbers)
+		return_pi1.submit()
+		
+		debit_act = frappe.db.get_value("Company",return_pi1.company,"stock_received_but_not_billed")
+		gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': debit_act},'debit')
+		self.assertEqual(gl_temp_credit, 500)
+		
+		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': 'Stock In Hand - _TC'},'credit')
+		self.assertEqual(gl_stock_debit, 500)
+
+	def test_make_mr_TC_SCK_185(self):
+			from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
+			if not frappe.db.exists("Company", "_Test Company"):
+				company = frappe.new_doc("Company")
+				company.company_name = "_Test Company"
+				company.default_currency = "INR"
+				company.insert()
+
+			fields = {
+				"has_serial_no": 1,
+				"has_batch_no": 1,
+				"create_new_batch": 1,
+				"is_stock_item": 1,
+				"has_expiry_date": 1,
+				"warranty_period": 365,
+				"shelf_life_in_days": 365,
+				"serial_no_series": "Test-SABBMRP-Sno.#####",
+				"batch_number_series": "Test-SBBTYT-NNS.#####",
+			}
+
+			if frappe.db.has_column("Item", "gst_hsn_code"):
+				fields["gst_hsn_code"] = "01011010"
+
+			company = "_Test Company"
+			qty = 10
+			frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
+			frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
+			target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
+			item = make_item("Test Batch Item SN Item", fields).name
+
+			new_stock = _make_stock_entry(
+				item_code=item,
+				qty=10,
+				to_warehouse=target_warehouse,
+				company="_Test Company",
+				rate=100,
+				# serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			
+			)
+
+			mr = make_material_request(
+				material_request_type="Material Issue", qty=qty, warehouse=target_warehouse, item_code=item,do_not_submit=True
+			)
+			mr.items[0].use_serial_batch_fields = 1
+			mr.items[0].serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			mr.submit()
+			self.assertEqual(mr.status, "Pending")
+
+			bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			stock_in_hand_account = get_inventory_account(company, target_warehouse)
+
+			# Make stock entry against material request issue
+			se = make_stock_entry(mr.name)
+			se.items[0].qty = 5
+			se.items[0].expense_account = "Cost of Goods Sold - _TC"
+			se.serial_and_batch_bundle = new_stock.items[0].serial_and_batch_bundle
+			se.insert()
+			se.submit()
+			mr.load_from_db()
+			self.assertEqual(mr.status, "Partially Ordered")
+
+			sle = frappe.get_doc("Stock Ledger Entry", {"voucher_no": se.name})
+			stock_value_diff = abs(
+				frappe.db.get_value(
+					"Stock Ledger Entry",
+					{"voucher_type": "Stock Entry", "voucher_no": se.name},
+					"stock_value_difference",
+				)
+			)
+			gle = get_gle(company, se.name, stock_in_hand_account)
+			gle1 = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+			self.assertEqual(sle.qty_after_transaction, bin_qty - se.items[0].qty)
+			self.assertEqual(gle[1], stock_value_diff)
+			self.assertEqual(gle1[0], stock_value_diff)
+			se.cancel()
+			mr.load_from_db()
+
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Cost of Goods Sold - _TC'}):
+				gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Cost of Goods Sold - _TC'},'credit')
+				self.assertEqual(gl_temp_credit, 500)
+			
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+				gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Stock In Hand - _TC'},'debit')
+				self.assertEqual(gl_stock_debit, 500)
+			
+			# After stock entry cancel
+			current_bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			sh_gle = get_gle(company, se.name, stock_in_hand_account)
+			cogs_gle = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+
+			self.assertEqual(sh_gle[0], sh_gle[1])
+			self.assertEqual(cogs_gle[0], cogs_gle[1])
+			self.assertEqual(current_bin_qty, bin_qty)
+
+	def test_make_mr_TC_SCK_186(self):
+		from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
+
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+
+		fields = {
+			"has_batch_no": 1,
+			"is_stock_item": 1,
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"warranty_period": 365,
+			"shelf_life_in_days": 365,
+			"batch_number_series": "Test-SBBTYT-NNS.#####",
+		}
+
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		company = "_Test Company"
+		qty = 10
+		frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
+		frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
+		source_warehouse = create_warehouse("_Test SWarehouse", properties=None, company=company)
+		target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
+		# target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
+		item = make_item("Test Batch Item SN Item", fields).name
+
+		new_stock = _make_stock_entry(
+			item_code=item,
+			qty=10,
+			to_warehouse=target_warehouse,
+			company="_Test Company",
+			rate=100,
+		)
+		self.assertTrue(new_stock.items[0].serial_and_batch_bundle)
+
+		mr = make_material_request(
+			material_request_type="Material Transfer", qty=qty, from_warehouse=target_warehouse ,warehouse=source_warehouse, item_code=item, 
+		)
+		mr.items[0].use_serial_batch_fields = 1
+		mr.submit()
+		# mr.items[0].batch_no = "Test-SBBTYT-NNS00001"
+		self.assertEqual(mr.status, "Pending")
+
+		bin_qty = (
+			frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+		)
+		stock_in_hand_account = get_inventory_account(company, target_warehouse)
+
+		# Make stock entry against material request issue
+		se = make_stock_entry(mr.name)
+		se.items[0].qty = 5
+		se.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se.items[0].batch_no = new_stock.items[0].batch_no
+		se.serial_and_batch_bundle = new_stock.items[0].serial_and_batch_bundle
+		se.insert()
+		print('batch',se.items[0].batch_no)
+		se.submit()
+		mr.load_from_db()
+		self.assertEqual(mr.status, "Partially Received")
+
+		sle = frappe.get_doc("Stock Ledger Entry", {"voucher_no": se.name})
+		stock_value_diff = abs(
+			frappe.db.get_value(
+				"Stock Ledger Entry",
+				{"voucher_type": "Stock Entry", "voucher_no": se.name},
+				"stock_value_difference",
+			)
+		)
+		gle = get_gle(company, se.name, stock_in_hand_account)
+		gle1 = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+		print('gle',gle, 'gle1',gle1, se)
+		self.assertEqual(sle.qty_after_transaction, bin_qty - se.items[0].qty)
+		if gle[1] is not None:
+			self.assertEqual(gle[1], stock_value_diff)
+		if gle1[0] is not None:
+			self.assertEqual(gle1[0], stock_value_diff)
+		se.cancel()
+		mr.load_from_db()
+
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Cost of Goods Sold - _TC'}):
+			gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Cost of Goods Sold - _TC'},'credit')
+			self.assertEqual(gl_temp_credit, 500)
+		
+		#if account setup in company
+		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Stock In Hand - _TC'},'debit')
+			self.assertEqual(gl_stock_debit, 500)
+		
+		# After stock entry cancel
+		current_bin_qty = (
+			frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+		)
+		sh_gle = get_gle(company, se.name, stock_in_hand_account)
+		cogs_gle = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+
+		self.assertEqual(sh_gle[0], sh_gle[1])
+		self.assertEqual(cogs_gle[0], cogs_gle[1])
+		self.assertEqual(current_bin_qty, bin_qty)
+
+
+	def test_make_mr_TC_SCK_187(self):
+			from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
+
+			if not frappe.db.exists("Company", "_Test Company"):
+				company = frappe.new_doc("Company")
+				company.company_name = "_Test Company"
+				company.default_currency = "INR"
+				company.insert()
+
+			fields = {
+				"has_serial_no": 1,
+				"is_stock_item": 1,
+				"has_expiry_date": 1,
+				"warranty_period": 365,
+				"shelf_life_in_days": 365,
+				"serial_no_series": "Test-SABBMRP-Sno.#####",
+			}
+
+			if frappe.db.has_column("Item", "gst_hsn_code"):
+				fields["gst_hsn_code"] = "01011010"
+
+			company = "_Test Company"
+			qty = 10
+			frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
+			frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
+			source_warehouse = create_warehouse("_Test SWarehouse", properties=None, company=company)
+			target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
+			item = make_item("Test Batch Item SN Item", fields).name
+
+			new_stock = _make_stock_entry(
+				item_code=item,
+				qty=10,
+				to_warehouse=target_warehouse,
+				company="_Test Company",
+				rate=100,
+				# serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			
+			)
+
+			mr = make_material_request(
+				material_request_type="Material Transfer", qty=qty, from_warehouse=target_warehouse ,warehouse=source_warehouse, item_code=item,do_not_submit=True
+			)
+			mr.items[0].use_serial_batch_fields = 1
+			mr.items[0].serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			mr.submit()
+			self.assertEqual(mr.status, "Pending")
+
+			bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			stock_in_hand_account = get_inventory_account(company, target_warehouse)
+
+			# Make stock entry against material request issue
+			se = make_stock_entry(mr.name)
+			se.items[0].qty = 5
+			se.items[0].expense_account = "Cost of Goods Sold - _TC"
+			se.insert()
+			se.submit()
+			mr.load_from_db()
+			self.assertEqual(mr.status, "Partially Received")
+
+			sle = frappe.get_doc("Stock Ledger Entry", {"voucher_no": se.name})
+			stock_value_diff = abs(
+				frappe.db.get_value(
+					"Stock Ledger Entry",
+					{"voucher_type": "Stock Entry", "voucher_no": se.name},
+					"stock_value_difference",
+				)
+			)
+			gle = get_gle(company, se.name, stock_in_hand_account)
+			gle1 = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+			print('gle',gle, 'gle1',gle1, se)
+			self.assertEqual(sle.qty_after_transaction, bin_qty - se.items[0].qty)
+			if gle[1] is not None:
+				self.assertEqual(gle[1], stock_value_diff)
+			if gle1[0] is not None:
+				self.assertEqual(gle1[0], stock_value_diff)
+			se.cancel()
+			mr.load_from_db()
+
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Cost of Goods Sold - _TC'}):
+				gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Cost of Goods Sold - _TC'},'credit')
+				self.assertEqual(gl_temp_credit, 500)
+			
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+				gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Stock In Hand - _TC'},'debit')
+				self.assertEqual(gl_stock_debit, 500)
+			
+			# After stock entry cancel
+			current_bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			sh_gle = get_gle(company, se.name, stock_in_hand_account)
+			cogs_gle = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+
+			self.assertEqual(sh_gle[0], sh_gle[1])
+			self.assertEqual(cogs_gle[0], cogs_gle[1])
+			self.assertEqual(current_bin_qty, bin_qty)
+
+	def test_make_mr_TC_SCK_188(self):
+			from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
+
+			if not frappe.db.exists("Company", "_Test Company"):
+				company = frappe.new_doc("Company")
+				company.company_name = "_Test Company"
+				company.default_currency = "INR"
+				company.insert()
+
+			fields = {
+				"has_serial_no": 1,
+				"has_batch_no": 1,
+				"is_stock_item": 1,
+				"create_new_batch": 1,
+				"has_expiry_date": 1,
+				"warranty_period": 365,
+				"shelf_life_in_days": 365,
+				"serial_no_series": "Test-SABBMRP-Sno.#####",
+			}
+
+			if frappe.db.has_column("Item", "gst_hsn_code"):
+				fields["gst_hsn_code"] = "01011010"
+
+			company = "_Test Company"
+			qty = 10
+			frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
+			frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
+			target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
+			item = make_item("Test Batch Item SN Item", fields).name
+
+			new_stock = _make_stock_entry(
+				item_code=item,
+				qty=10,
+				to_warehouse=target_warehouse,
+				company="_Test Company",
+				rate=100,
+				# serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			
+			)
+
+			mr = make_material_request(
+				material_request_type="Material Issue", qty=qty, warehouse=target_warehouse, item_code=item,do_not_submit=True
+			)
+			mr.items[0].use_serial_batch_fields = 1
+			mr.items[0].serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+			mr.submit()
+			self.assertEqual(mr.status, "Pending")
+
+			bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			stock_in_hand_account = get_inventory_account(company, target_warehouse)
+
+			# Make stock entry against material request issue
+			se = make_stock_entry(mr.name)
+			se.items[0].qty = 5
+			se.items[0].expense_account = "Cost of Goods Sold - _TC"
+			se.items[0].batch_no = new_stock.items[0].batch_no
+			se.serial_and_batch_bundle = new_stock.items[0].serial_and_batch_bundle
+			se.insert()
+			se.submit()
+			mr.load_from_db()
+			self.assertEqual(mr.status, "Partially Ordered")
+
+			sle = frappe.get_doc("Stock Ledger Entry", {"voucher_no": se.name})
+			stock_value_diff = abs(
+				frappe.db.get_value(
+					"Stock Ledger Entry",
+					{"voucher_type": "Stock Entry", "voucher_no": se.name},
+					"stock_value_difference",
+				)
+			)
+			gle = get_gle(company, se.name, stock_in_hand_account)
+			gle1 = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+			self.assertEqual(sle.qty_after_transaction, bin_qty - se.items[0].qty)
+			self.assertEqual(gle[1], stock_value_diff)
+			self.assertEqual(gle1[0], stock_value_diff)
+			se.cancel()
+			mr.load_from_db()
+
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Cost of Goods Sold - _TC'}):
+				gl_temp_credit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Cost of Goods Sold - _TC'},'credit')
+				self.assertEqual(gl_temp_credit, 500)
+			
+			#if account setup in company
+			if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
+				gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':se.name, 'account': 'Stock In Hand - _TC'},'debit')
+				self.assertEqual(gl_stock_debit, 500)
+			
+			# After stock entry cancel
+			current_bin_qty = (
+				frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
+			)
+			sh_gle = get_gle(company, se.name, stock_in_hand_account)
+			cogs_gle = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+
+			self.assertEqual(sh_gle[0], sh_gle[1])
+			self.assertEqual(cogs_gle[0], cogs_gle[1])
+			self.assertEqual(current_bin_qty, bin_qty)
 
 def get_in_transit_warehouse(company):
 	if not frappe.db.exists("Warehouse Type", "Transit"):

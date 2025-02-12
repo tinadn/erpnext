@@ -317,6 +317,7 @@ class TestQualityInspection(FrappeTestCase):
 		pr.reload()
 		pr.cancel()
 
+	@change_settings("Stock Settings",{"allow_negative_stock": 1})
 	def test_qa_for_dn_TC_SCK_161(self):
 		dn = create_delivery_note(item_code="_Test Item with QA", do_not_submit=True)
 

@@ -1117,7 +1117,9 @@ def get_bom_items_as_dict(
 	fetch_qty_in_stock_uom=True,
 ):
 	item_dict = {}
-
+	include_project = "projects" in frappe.get_installed_apps()
+	project_column = ", bom.project" if include_project else ""
+	project_group_by = "bom.project," if include_project else ""
 	# Did not use qty_consumed_per_unit in the query, as it leads to rounding loss
 	query = """select
 				bom_item.item_code,
@@ -1125,7 +1127,7 @@ def get_bom_items_as_dict(
 				item.item_name,
 				sum(bom_item.{qty_field}/ifnull(bom.quantity, 1)) * %(qty)s as qty,
 				item.image,
-				bom.project,
+				{project_column},
 				bom_item.rate,
 				sum(bom_item.{qty_field}/ifnull(bom.quantity, 1)) * bom_item.rate * %(qty)s as amount,
 				item.stock_uom,
@@ -1150,7 +1152,7 @@ def get_bom_items_as_dict(
 				bom_item.idx,
                 item.item_name,
                 item.image,
-                bom.project,
+				{project_column},
                 bom_item.rate,
                 item.stock_uom,
                 item.item_group,
@@ -1159,7 +1161,10 @@ def get_bom_items_as_dict(
                 item_default.expense_account,
                 item_default.buying_cost_center,
 				{group_by_fields}
-				order by bom_item.idx"""
+			order by bom_item.idx""".format(
+			project_column=project_column,	
+			project_group_by=project_group_by,
+		)
 
 	is_stock_item = 0 if include_non_stock_items else 1
 	if cint(fetch_exploded):
@@ -1374,6 +1379,61 @@ def add_operations_cost(stock_entry, work_order=None, expense_account=None):
 					"amount": additional_operating_cost_per_unit * flt(stock_entry.fg_completed_qty),
 				},
 			)
+
+	def get_max_op_qty():
+		from frappe.query_builder.functions import Sum
+		table = frappe.qb.DocType("Job Card")
+		query = (
+			frappe.qb.from_(table)
+			.select(Sum(table.total_completed_qty).as_("qty"))
+			.where(
+				(table.docstatus == 1)
+				& (table.work_order == work_order.name)
+				& (table.is_corrective_job_card == 0)
+			)
+			.groupby(table.operation)
+		)
+		return min([d.qty for d in query.run(as_dict=True)], default=0)
+	def get_utilised_cc():
+		from frappe.query_builder.functions import Sum
+		table = frappe.qb.DocType("Stock Entry")
+		subquery = (
+			frappe.qb.from_(table)
+			.select(table.name)
+			.where(
+				(table.docstatus == 1)
+				& (table.work_order == work_order.name)
+				& (table.purpose == "Manufacture")
+			)
+		)
+		table = frappe.qb.DocType("Landed Cost Taxes and Charges")
+		query = (
+			frappe.qb.from_(table)
+			.select(Sum(table.amount).as_("amount"))
+			.where(table.parent.isin(subquery) & (table.has_corrective_cost == 1))
+		)
+		return query.run(as_dict=True)[0].amount or 0
+	if (
+		work_order
+		and work_order.corrective_operation_cost
+		and cint(
+			frappe.db.get_single_value(
+				"Manufacturing Settings", "add_corrective_operation_cost_in_finished_good_valuation"
+			)
+		)
+	):
+		
+		max_qty = get_max_op_qty() - work_order.produced_qty
+		remaining_cc = work_order.corrective_operation_cost - get_utilised_cc()
+		stock_entry.append(
+			"additional_costs",
+			{
+				"expense_account": expense_account,
+				"description": "Corrective Operation Cost",
+				"has_corrective_cost": 1,
+				"amount": remaining_cc / max_qty * flt(stock_entry.fg_completed_qty),
+			},
+		)
 
 
 @frappe.whitelist()

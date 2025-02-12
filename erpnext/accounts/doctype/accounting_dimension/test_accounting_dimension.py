@@ -40,6 +40,46 @@ class TestAccountingDimension(unittest.TestCase):
 		gle = frappe.get_doc("GL Entry", {"voucher_no": si.name, "account": "Sales - _TC"})
 
 		self.assertEqual(gle.get("department"), "_Test Department - _TC")
+  
+	def test_auto_creation_of_accounts_on_company_creation_TC_ACC_066(self):
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.abbr = "_TC"
+			company.default_currency = "INR"
+			company.create_chart_of_accounts_based_on = "Standard"
+			company.save()
+		
+		if not frappe.db.exists("Company", "_Test Agro"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Agro"
+			company.abbr = "_TA"
+			company.default_currency = "INR"
+			company.create_chart_of_accounts_based_on = "Existing Company"
+			company.existing_company = "_Test Company"
+			company.save()
+
+			expected_results = {
+				"Debtors - _TA": {
+					"account_type": "Receivable",
+					"is_group": 0,
+					"root_type": "Asset",
+					"parent_account": "Accounts Receivable - _TA",
+				},
+				"Cash - _TA": {
+					"account_type": "Cash",
+					"is_group": 0,
+					"root_type": "Asset",
+					"parent_account": "Cash In Hand - _TA",
+				},
+			}
+			for account, acc_property in expected_results.items():
+				acc = frappe.get_doc("Account", account)
+				for prop, val in acc_property.items():
+					self.assertEqual(acc.get(prop), val)
+
+			frappe.delete_doc("Company", "_Test Agro")
+
 
 	def test_cost_center_in_gl_and_reports_TC_ACC_067(self):
 		# Step 1: Create a Sales Invoice (SI) with a Cost Center

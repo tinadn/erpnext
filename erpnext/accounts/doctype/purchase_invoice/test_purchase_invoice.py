@@ -5,7 +5,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase, change_settings
 from frappe.utils import add_days, cint, flt, getdate, nowdate, today, get_year_start, get_year_ending
-
+from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 import erpnext
 from erpnext.accounts.doctype.account.test_account import create_account, get_inventory_account
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
@@ -3043,6 +3043,50 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 		pi_status = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status, "Partly Paid")
+		
+	def test_material_transfer_between_branch_TC_B_149(self):
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_company_and_supplier
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		from erpnext.accounts.doctype.sales_invoice.sales_invoice import make_inter_company_purchase_invoice
+		get_required_data = create_company_and_supplier()
+		parent_company = get_required_data.get("parent_company")
+		child_company = get_required_data.get("child_company")
+		supplier = get_required_data.get("supplier")
+		customer = get_required_data.get("customer")
+		price_list = get_required_data.get("price_list")
+		item_name = make_test_item("test_service")
+		si = frappe.get_doc(
+			{
+				"doctype": "Sales Invoice",
+				"company": parent_company,
+				"customer": customer,
+				"due_date": today(),
+				"currency": "INR",
+				"selling_price_list": price_list,
+				"items": [
+					{
+						"item_code": item_name,
+						"qty": 10,
+						"rate": 100,
+					}
+				]
+			}
+		)
+		si.insert()
+		si.submit()
+		self.assertEqual(si.company, parent_company)
+		self.assertEqual(si.customer, customer)
+		self.assertEqual(si.selling_price_list, price_list)
+		self.assertEqual(si.items[0].rate, 100)
+		self.assertEqual(si.total, 1000)
+		pi = make_inter_company_purchase_invoice(si.name)
+		pi.bill_no = "test bill"
+		pi.insert()
+		pi.submit()
+		self.assertEqual(pi.company, child_company)
+		self.assertEqual(pi.supplier, supplier)
+		self.assertEqual(pi.items[0].rate, 100)
+		self.assertEqual(pi.total, 1000)
 
 	def test_fully_paid_of_pi_to_pr_to_pe_TC_B_082(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_entry
@@ -3816,6 +3860,44 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 					total_amount += item_wise_tax_detail["_Test GST Item"][1]
 			self.assertEquals(total_tax,rate.get('total_tax'))
 			self.assertEquals(total_amount,rate.get('total_amount'))
+	def test_direct_purchase_invoice_via_update_stock_TC_SCK_131(self):
+		# Create Purchase Invoice with Update Stock
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier 1",
+			item_code="Book",
+			qty=5,
+			update_stock=True,
+			warehouse="Stores - _TC",
+			do_not_save=True
+		)
+		pi.save()
+		pi.submit()
+
+		# Check Stock Ledger Entries
+		sle = frappe.get_all(
+			"Stock Ledger Entry",
+			filters={"voucher_no": pi.name},
+			fields=["item_code", "warehouse", "actual_qty", "stock_value_difference"]
+		)
+		self.assertEqual(len(sle), 1)
+		self.assertEqual(sle[0].item_code, "Book")
+		self.assertEqual(sle[0].warehouse, "Stores - _TC")
+		self.assertEqual(sle[0].actual_qty, 5)
+
+		# Check Accounting Ledger Entries
+		gl_entries = frappe.get_all(
+			"GL Entry",
+			filters={"voucher_no": pi.name},
+			fields=["account", "debit", "credit"]
+		)
+		print(gl_entries,pi.as_dict().grand_total)
+		self.assertTrue(gl_entries)
+		expected_gl_entries = [
+			{"account": "Creditors - _TC", "debit": 0, "credit": pi.grand_total},
+			{"account": "Stock In Hand - _TC", "debit": pi.grand_total, "credit": 0}
+		]
+		for gle in expected_gl_entries:
+			self.assertTrue(any(entry["account"] == gle["account"] and entry["debit"] == gle["debit"] and entry["credit"] == gle["credit"] for entry in gl_entries))
 	def test_supplier_invoice_number_uniqueness_validation_TC_ACC_136(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
 
@@ -3849,7 +3931,416 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		except Exception as e:
 			error_msg = str(e)
 			self.assertEqual(error_msg, f'Supplier Invoice No exists in Purchase Invoice {pi.name}')
+
+	def setUp(self):
+		from erpnext.accounts.doctype.pricing_rule.test_pricing_rule import make_pricing_rule
+		from erpnext.stock.doctype.item.test_item import make_item
+
+		import random
+        # Ensure supplier exists
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+
+		supplier = create_supplier(
+			supplier_name="Monica",
+			supplier_type="Company",
+		)
+
+		if not frappe.db.exists("Supplier", supplier.supplier_name):
+			supplier.insert()
+
+        # Ensure Item exists with rate rules
+		it_fields = {
+			"item_name": "Boat Earpods",
+            "is_stock_item": 1,
+            "stock_uom": "Nos",
+            "valuation_rate": 5000,
+            "standard_rate": 5000
+		}
+		
+		item = make_item("Boat Earpods", it_fields).name
+		
+		self.pricing_rule =make_pricing_rule(
+			apply_on="Item Code",
+			title="Boat Earpods - Monica Discount",
+			items=[{"item_code": "Boat Earpods"}],
+			supplier="Monica",
+			min_qty= 10,
+			company= "_Test Company",
+			rate_or_discount="Discount Percentage",
+			discount_percentage=10,
+			valid_from="2024-12-01",
+			selling = 0,
+			buying = 1,
+			apply_discount_on = "Rate",
+			price_or_product_discount= "Price",
+			apply_rule_on = "Transaction",
+			apply_on_transaction = "Purchase Invoice"
+		)
+		frappe.db.commit()
+		
+	def test_purchase_invoice_discount(self):
+        # Create Purchase Invoice
+		pi = make_purchase_invoice(
+			company = "_Test Company",
+			supplier= "Monica",
+            posting_date= "2024-12-15",
+            update_stock= 1,
+			set_warehouse= create_warehouse("Stores-test", properties=None, company="_Test Company"),
+			warehouse= create_warehouse("Stores-test", properties=None, company="_Test Company"),
+			qty=20,
+			item_code="Boat Earpods",
+		)
+		# pi.insert()
+		# pi.submit()
+
+        # Validate Stock Ledger Entry
+		sle = frappe.get_all("Stock Ledger Entry", 
+                             filters={"voucher_no": pi.name},
+                             fields=["actual_qty", "valuation_rate", "incoming_rate", "stock_value", "stock_value_difference"])
+		print(sle[0]["actual_qty"], sle[0]["valuation_rate"], sle[0]["incoming_rate"], sle[0]["stock_value"], sle[0]["stock_value_difference"])
+		self.assertEqual(sle[0]["actual_qty"], 20)
+		self.assertEqual(sle[0]["valuation_rate"], 4500)
+
+  
 	
+		
+	def test_lcv_with_purchase_invoice_for_stock_item_TC_ACC_112(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
+			make_test_item
+		)
+
+		item = make_test_item("_Test Item")
+		item.is_stock_item = 1
+		item.save()
+
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1000,
+			do_not_submit=True,
+			update_stock=True
+		)
+		pi.submit()
+
+		lvc =frappe.get_doc({
+			"doctype":"Landed Cost Voucher",
+			"company":"_Test Company",
+			"posting_date":pi.posting_date,
+			"purchase_receipts":[
+				{
+					"receipt_document_type":"Purchase Invoice",
+					"receipt_document":pi.name,
+					"supplier":"_Test Supplier",
+					"grand_total":pi.grand_total,
+					"posting_date":pi.posting_date
+				}
+			]
+		})
+		lvc.get_items_from_purchase_receipts()
+		lvc.append("taxes",{
+			"expense_account":"Expenses Included In Valuation - _TC",
+			"amount":"300",
+			"account_currency":"INR",
+			"description":"test"
+		})
+		lvc.save()
+		lvc.submit()
+  
+		expected_gle = [
+			['Creditors - _TC', 0.0, pi.grand_total, pi.posting_date],
+			['Expenses Included In Valuation - _TC', 0.0, 300.0, pi.posting_date],
+			['Stock In Hand - _TC', pi.grand_total+300, 0.0, pi.posting_date]
+		]
+  
+		check_gl_entries(self ,pi.name,expected_gle=expected_gle,posting_date=pi.posting_date)
+  
+	def test_lcv_with_purchase_invoice_for_fixed_asset_item_TC_ACC_113(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
+			make_test_item
+		)
+
+		item = make_test_item("_Test Asstes Item")
+
+		if not item.is_fixed_asset:
+			item.is_stock_item = 0
+			item.is_fixed_asset = 1
+			item.auto_create_assets = 1
+			item.asset_category = "Test_Category"
+			item.asset_naming_series = "ACC-ASS-.YYYY.-"
+			item.flags.ignore_mandatory = 1
+			item.save()
+  
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1000,
+			do_not_submit=True,
+			update_stock=True,
+			do_not_save=True
+		)
+  
+		pi.items[0].asset_location = "Test Location"
+  
+		pi.insert().submit()
+  
+		lvc =frappe.get_doc({
+			"doctype":"Landed Cost Voucher",
+			"company":"_Test Company",
+			"posting_date":pi.posting_date,
+			"purchase_receipts":[
+				{
+					"receipt_document_type":"Purchase Invoice",
+					"receipt_document":pi.name,
+					"supplier":"_Test Supplier",
+					"grand_total":pi.grand_total,
+					"posting_date":pi.posting_date	
+				}
+			]
+		})
+  
+		lvc.get_items_from_purchase_receipts()
+		lvc.append("taxes",{
+			"expense_account":"Expenses Included In Valuation - _TC",
+			"amount":"300",
+			"account_currency":"INR",
+			"description":"test"
+		})
+  
+		lvc.save()
+		lvc.submit()
+  
+		expected_gle =[
+			['Capital Equipments - _TC',pi.grand_total+300, 0.0, pi.posting_date],
+			['Creditors - _TC', 0.0, 1000.0, pi.posting_date],
+			['Expenses Included In Valuation - _TC', 0.0, 300.0, pi.posting_date],
+		]
+		
+		check_gl_entries(self ,pi.name,expected_gle=expected_gle,posting_date=pi.posting_date)
+  
+	def test_payment_term_discount_for_pi_at_fully_paid_TC_ACC_098(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
+			make_test_item
+		)
+		if not frappe.db.exists("Payment Term","_Test Discount Term"):
+			pt = frappe.get_doc({
+				"doctype":"Payment Term",
+				"payment_term_name":"_Test Discount Term",
+				"invoice_portion":100,
+				"mode_of_payment":"Cash",
+				"discount_type":"Percentage",
+				"due_date_based_on":"Day(s) after invoice date",	
+				"discount":10
+			}).insert()
+
+		pt = frappe.get_doc("Payment Term","_Test Discount Term")
+		
+		item = make_test_item("_Test Item")
+  
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1000,
+			do_not_submit=True,
+   			do_not_save = True
+		)
+  
+		pi.append("payment_schedule",{
+			"payment_term":"_Test Discount Term",
+			"due_date":add_days(nowdate(),1),
+			"invoice_portion":100,
+			"payment_amount":pi.grand_total,
+			"discount_date":add_days(nowdate(),1),
+		})
+		pi.insert().submit()
+		pe = get_payment_entry(pi.doctype,pi.name,bank_account="Cash - _TC",reference_date=nowdate())
+		pe.reference_no = "1"
+		pe.deductions[0].account="_Test Account Discount - _TC"
+		pe.save().submit()
+		expected_gle =[
+			['Cash - _TC', 0.0,(pi.grand_total-pi.grand_total * 0.1), nowdate()],
+			['Creditors - _TC',  pi.grand_total,0.0, nowdate()],
+			['_Test Account Discount - _TC', 0.0,pi.grand_total * 0.1, nowdate()]
+		]
+		check_gl_entries(self,voucher_no=pe.name,expected_gle=expected_gle,posting_date=nowdate(),voucher_type="Payment Entry")
+  
+	def test_payment_term_discount_for_pi_at_partially_paid_TC_ACC_100(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
+			make_test_item
+		)
+		if not frappe.db.exists("Payment Term","_Test partially Discount Term"):
+			pt = frappe.get_doc({
+				"doctype":"Payment Term",		
+				"payment_term_name":"_Test partially Discount Term",
+				"invoice_portion":70,
+				"mode_of_payment":"Cash",
+				"discount_type":"Percentage",
+				"due_date_based_on":"Day(s) after invoice date",
+				"discount":5
+			}).insert()
+
+		pt = frappe.get_doc("Payment Term","_Test partially Discount Term")
+		
+		item = make_test_item("_Test Item")
+  
+		pi = make_purchase_invoice(
+			supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=1000,
+			do_not_submit=True,
+   			do_not_save = True
+		)
+  
+		pi.append("payment_schedule",{
+			"payment_term":"_Test partially Discount Term",
+			"due_date":add_days(nowdate(),1),
+			"invoice_portion":70,
+			"payment_amount":1000 * 0.7,
+			"discount_date":add_days(nowdate(),1),
+		})
+  
+		pi.insert().submit()
+		pe = get_payment_entry(pi.doctype,pi.name,bank_account="Cash - _TC",reference_date=nowdate())
+		pe.reference_no = "1"
+		pe.deductions[0].account="_Test Account Discount - _TC"
+
+		pe.save().submit()
+
+		expected_gle =[
+			['Cash - _TC', 0.0,(pi.grand_total-pi.grand_total * 0.05), nowdate()],
+			['Creditors - _TC',pi.grand_total,0.0, nowdate()],
+			['_Test Account Discount - _TC',0.0, pi.grand_total * 0.05, nowdate()]
+		]
+
+		check_gl_entries(self,voucher_no=pe.name,expected_gle=expected_gle,posting_date=nowdate(),voucher_type="Payment Entry")
+  
+	def test_stop_pi_creation_when_value_exceeds_budget_TC_ACC_133(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		from erpnext.accounts.utils import get_fiscal_year
+		
+		year = get_fiscal_year(date=nowdate(), company="_Test Company")[0]
+		company = frappe.get_doc("Company","_Test Company")
+		if company.stock_received_but_not_billed !="Cost of Goods Sold - _TC":
+			company.stock_received_but_not_billed = "Cost of Goods Sold - _TC"
+			company.save()
+			frappe.db.commit()
+		budget = frappe.get_doc({
+			"doctype":"Budget",
+			"budget_against":"Cost Center",
+			"company":"_Test Company",
+			"cost_center":"_Test Write Off Cost Center - _TC",
+			"fiscal_year":year,
+			"applicable_on_purchase_order":1,
+			"action_if_annual_budget_exceeded_on_po": "Stop",
+			"action_if_accumulated_monthly_budget_exceeded_on_po": "Stop",
+			"applicable_on_booking_actual_expenses":1,
+			"action_if_annual_budget_exceeded": "Stop",
+			"action_if_accumulated_monthly_budget_exceeded": "Stop",
+			"accounts":[{
+				"account":"Cost of Goods Sold - _TC",
+				"budget_amount":10000
+			}]
+		}).insert().submit()
+  
+		item = make_test_item("_Test Item")
+		try:
+			pi = make_purchase_invoice(
+				supplier="_Test Supplier",
+				company="_Test Company",
+				item_code=item.name,
+				qty=1,
+				rate=11000,
+				expense_account = "Cost of Goods Sold - _TC",
+				do_not_submit=True,
+			)
+	
+			pi.cost_center = "_Test Write Off Cost Center - _TC"
+			pi.items[0].cost_center = "_Test Write Off Cost Center - _TC"
+
+			pi.save().submit()
+		except Exception as e:
+			print(str(e))
+			self.assertEqual(str(e),"""Annual Budget for Account Cost of Goods Sold - _TC against Cost Center _Test Write Off Cost Center - _TC is ₹ 10,000.00. It will be exceed by ₹ 1,000.00Total Expenses booked through - Actual Expenses - ₹ 0.00Material Requests - ₹ 0.00Unbilled Orders - ₹ 0.00""")
+
+			budget.cancel()
+			budget.load_from_db()
+			pi.cancel()
+			pi.load_from_db()
+			frappe.delete_doc("Budget", budget.name,force=1)
+			frappe.delete_doc("Purchase Invoice", pi.name,force=1)
+			frappe.db.commit()
+   
+	def test_warn_pi_creation_when_value_exceeds_budget_TC_ACC_145(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		from erpnext.accounts.utils import get_fiscal_year
+		
+		year = get_fiscal_year(date=nowdate(), company="_Test Company")[0]
+		company = frappe.get_doc("Company","_Test Company")
+		if company.stock_received_but_not_billed !="Cost of Goods Sold - _TC":
+			company.stock_received_but_not_billed = "Cost of Goods Sold - _TC"
+			company.save()
+			frappe.db.commit()
+		budget = frappe.get_doc({
+			"doctype":"Budget",
+			"budget_against":"Cost Center",
+			"company":"_Test Company",
+			"cost_center":"_Test Write Off Cost Center - _TC",
+			"fiscal_year":year,
+			"applicable_on_purchase_order":1,
+			"action_if_annual_budget_exceeded_on_po": "Warn",
+			"action_if_accumulated_monthly_budget_exceeded_on_po": "Warn",
+			"applicable_on_booking_actual_expenses":1,
+			"action_if_annual_budget_exceeded": "Warn",
+			"action_if_accumulated_monthly_budget_exceeded": "Warn",
+			"accounts":[{
+				"account":"Cost of Goods Sold - _TC",
+				"budget_amount":10000
+			}]
+		}).insert().submit()
+  
+		item = make_test_item("_Test Item")
+		
+		pi = make_purchase_invoice(
+				supplier="_Test Supplier",
+			company="_Test Company",
+			item_code=item.name,
+			qty=1,
+			rate=11000,
+			expense_account = "Cost of Goods Sold - _TC",
+			do_not_submit=True,
+		)
+
+		pi.cost_center = "_Test Write Off Cost Center - _TC"
+		pi.items[0].cost_center = "_Test Write Off Cost Center - _TC"
+
+		pi.save().submit()
+		budget_exceeded_found = False
+
+		for msg in frappe.get_message_log():
+			if msg.get("title") == "Budget Exceeded" and msg.get("indicator") == "orange":
+				if "Annual Budget for Account" in msg.get("message", ""):
+					budget_exceeded_found = True
+					break  
+
+		self.assertTrue(budget_exceeded_found, "Budget exceeded message not found")
+		budget.cancel()
+		budget.load_from_db()
+		pi.cancel()
+		pi.load_from_db()
+		frappe.delete_doc("Budget", budget.name,force=1)
+		frappe.delete_doc("Purchase Order", pi.name,force=1)
+		frappe.db.commit()
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
 		"Company",
