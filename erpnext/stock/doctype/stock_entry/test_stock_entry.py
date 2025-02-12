@@ -3277,7 +3277,6 @@ class TestStockEntry(FrappeTestCase):
 		item_2 = create_item(item_code="ST-N-001", valuation_rate=200)
 		item_3 = create_item(item_code="GU-SE-001", valuation_rate=300)
 		item_4 = create_item(item_code="SCW-N-001", valuation_rate=400)
-		
 		items = [
 			{
 				"s_warehouse": create_warehouse("Test Store 1"),
@@ -3313,6 +3312,16 @@ class TestStockEntry(FrappeTestCase):
 		self.assertEqual(se.items[0].qty, 10)
 		self.assertEqual(se.purpose, "Manufacture")
 		self.assertEqual(se.items[2].is_finished_item, 1)
+		sle_entries = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": se.name}, fields=['item_code', 'actual_qty'])
+		for sle in sle_entries:
+			if sle['item_code'] == item_1.item_code:
+				self.assertEqual(sle['actual_qty'], -10)
+			elif sle['item_code'] == item_2.item_code:
+				self.assertEqual(sle['actual_qty'], -42)
+			elif sle['item_code'] == item_3.item_code:
+				self.assertEqual(sle['actual_qty'], 8)
+			elif sle['item_code'] == item_4.item_code:
+				self.assertEqual(sle['actual_qty'], 2)
 
 	def test_stock_manufacture_with_batch_TC_SCK_139(self):
 		company = create_company()
@@ -3323,6 +3332,10 @@ class TestStockEntry(FrappeTestCase):
 		se.submit()
 		self.assertEqual(se.purpose, "Manufacture")
 		self.assertEqual(se.items[0].is_finished_item, 1)
+		sle_entries = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": se.name}, fields=['item_code', 'actual_qty'])
+		for sle in sle_entries:
+			if sle['item_code'] == item.item_code:
+				self.assertEqual(sle['actual_qty'], 150)
 
 def create_company(company=None):
 	if not company:
