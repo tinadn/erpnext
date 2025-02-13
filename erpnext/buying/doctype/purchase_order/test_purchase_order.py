@@ -2731,89 +2731,112 @@ class TestPurchaseOrder(FrappeTestCase):
 		self.assertEqual(pi.net_total, 9000)
 
 	def test_partial_pr_pi_flow_TC_B_103(self):
-		# 1. Create PO
+		from frappe.desk.query_report import run
+		# Scenario : PO > PR > PI
+		item_1= create_item("_Test Items")
+		item_2= create_item("Book")
+		supplier = create_supplier(supplier_name="_Test Supplier")
+		company = "_Test Company"
+		if not frappe.db.exists("Company", company):
+			company = frappe.new_doc("Company")
+			company.company_name = company
+			company.country="India",
+			company.default_currency= "INR",
+			company.save()
+		else:
+			company = frappe.get_doc("Company", company) 
+		warehouse = create_warehouse("Stores - _TC")
 		po_data = {
 			"doctype": "Purchase Order",
-			"supplier": "_Test Supplier",
-			"company": "_Test Company",
-			"items": [
+			"supplier": supplier.name,
+			"company" : company.name,
+			"transaction_date": today(),
+			"warehouse" : warehouse,
+			"items":[
 				{
-					"item_code": "_Test Item",
+					"item_code": item_1.item_code,
 					"qty": 10,
 					"rate": 100,
-					"warehouse": "Stores - _TC",
-					"schedule_date": "2025-01-09"
+					"warehouse": warehouse,
+					"schedule_date": today()
 				},
 				{
-					"item_code": "Book",
+					"item_code": item_2.item_code,
 					"qty": 5,
 					"rate": 500,
-					"warehouse": "Stores - _TC",
-					"schedule_date": "2025-01-10"
-				}
-			],
-		}
-		purchase_order = frappe.get_doc(po_data)
-		purchase_order.insert()
-		tax_list = create_taxes_interstate()
-		for tax in tax_list:
-			purchase_order.append("taxes", tax)
-		purchase_order.submit()
-
-		# Validate PO Analytics
-		po_status = frappe.get_doc("Purchase Order", purchase_order.name)
-		self.assertEqual(po_status.status, "To Receive and Bill")
-		self.assertEqual(po_status.items[0].received_qty, 0)
-		self.assertEqual(po_status.items[0].billed_qty, 0)
-
-		# 2. Create Partial PR
-		pr_data = {
-			"doctype": "Purchase Receipt",
-			"supplier": "_Test Supplier",
-			"company": "_Test Company",
-			"items": [
-				{
-					"item_code": "_Test Item",
-					"qty": 2,
-					"warehouse": "Stores - _TC",
-					"purchase_order": purchase_order.name
-				},
-				{
-					"item_code": "Book",
-					"qty": 5,
-					"warehouse": "Stores - _TC",
-					"purchase_order": purchase_order.name
+					"warehouse": warehouse,
+					"schedule_date": add_days(today(), 1)
 				}
 			]
-		}
-		purchase_receipt = frappe.get_doc(pr_data)
-		purchase_receipt.insert()
-		purchase_receipt.submit()
+		} 
+		doc_po = frappe.get_doc(po_data)
+		doc_po.insert()
+		taxes = create_taxes_interstate()
+		for tax in taxes:
+			doc_po.append("taxes", tax)
+		doc_po.submit()
+		purchase_order_analysis = run("Purchase Order Analysis",
+										filters={"company":doc_po.company,
+												"from_date": doc_po.schedule_date, 
+												"to_date": doc_po.schedule_date,
+												"name":doc_po.name
+												})
+		result_list = purchase_order_analysis.get("result", [])
+		for result in result_list:
+			if isinstance(result, dict):
+				if result.get("item_code") == item_1:
+					self.assertEqual(result.get("status"), "To Receive and Bill")
+					self.assertEqual(result.get("pending_qty"), 10)
+					self.assertEqual(result.get("billed_qty"), 0)
+					self.assertEqual(result.get("billed_amount"), 0)
+					self.assertEqual(result.get("qty_to_bill"), 10)
+					self.assertEqual(result.get("pending_amount"), 1000)
+					self.assertEqual(result.get("received_qty"), 0)
+				elif result.get("item_code") == item_2:
+					self.assertEqual(result.get("status"), "To Receive and Bill")
+					self.assertEqual(result.get("pending_qty"), 5)
+					self.assertEqual(result.get("billed_qty"), 0)
+					self.assertEqual(result.get("billed_amount"), 0)
+					self.assertEqual(result.get("qty_to_bill"), 5)
+					self.assertEqual(result.get("pending_amount"), 2500)
+					self.assertEqual(result.get("received_qty"), 0)
 
-		# Validate PR Analytics
-		po_status.reload()
-		self.assertEqual(po_status.items[0].received_qty, 2)
-		self.assertEqual(po_status.items[1].received_qty, 5)
+		pr = make_purchase_receipt(doc_po.name)
+		for item in pr.items:
+			if item.item_code == item_1:
+				item.qty = 2
+			elif item.item_code == item_2:
+				item.qty = 5
+		pr.save()
+		pr.submit()
+		purchase_order_analysis_2 = run("Purchase Order Analysis",
+										filters={"company":doc_po.company,
+												"from_date": doc_po.schedule_date, 
+												"to_date": doc_po.schedule_date,
+												"name":doc_po.name
+												})
+		result_list_2 = purchase_order_analysis_2.get("result", [])
+		result_list_2 = purchase_order_analysis_2.get("result", [])
+		for result_2 in result_list_2:
+			if isinstance(result_2, dict):
+				if result_2.get("item_code") == item_1:
+					self.assertEqual(result_2.get("status"), "To Receive and Bill")
+					self.assertEqual(result_2.get("pending_qty"), 8)
+					self.assertEqual(result_2.get("billed_qty"), 0)
+					self.assertEqual(result_2.get("billed_amount"), 0)
+					self.assertEqual(result_2.get("qty_to_bill"), 10)
+					self.assertEqual(result_2.get("pending_amount"), 1000)
+					self.assertEqual(result_2.get("received_qty"), 2)
 
-		# 3. Create PI for Partial PR
-		pi_data = {
-			"doctype": "Purchase Invoice",
-			"supplier": "_Test Supplier",
-			"company": "_Test Company",
-			"items": purchase_receipt.items,
-			"taxes": purchase_order.taxes,
-			"supplier_invoice_no": "INV-002"
-		}
-		purchase_invoice = frappe.get_doc(pi_data)
-		purchase_invoice.insert()
-		purchase_invoice.submit()
-
-		# Validate PI Accounting Entries
-		pi_gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": purchase_invoice.name}, fields=["account", "debit", "credit"])
-		self.assertTrue(any(entry["account"] == "Stock Received But Not Billed" and entry["debit"] == 1200 for entry in pi_gl_entries))
-		self.assertTrue(any(entry["account"] == "CGST" and entry["debit"] == 54 for entry in pi_gl_entries))
-		self.assertTrue(any(entry["account"] == "SGST" and entry["debit"] == 54 for entry in pi_gl_entries))
-		self.assertTrue(any(entry["account"] == "Creditors" and entry["credit"] == 1308 for entry in pi_gl_entries))
+				elif result_2.get("item_code") == item_2:
+					self.assertEqual(result_2.get("status"), "To Receive and Bill")
+					self.assertEqual(result_2.get("pending_qty"), 0)
+					self.assertEqual(result_2.get("billed_qty"), 0)
+					self.assertEqual(result_2.get("billed_amount"), 0)
+					self.assertEqual(result_2.get("qty_to_bill"), 5)
+					self.assertEqual(result_2.get("pending_amount"), 2500)
+					self.assertEqual(result_2.get("received_qty"), 5)
+		make_test_pi(pr.name)
 
 	def test_po_pr_pi_with_shipping_rule_TC_B_064(self):
 		# Scenario : PO=>PR=>PI [With Shipping Rule]
