@@ -2838,6 +2838,73 @@ class TestPurchaseOrder(FrappeTestCase):
 					self.assertEqual(result_2.get("received_qty"), 5)
 		make_test_pi(pr.name)
 
+	def test_previous_row_total_flow_TC_B_141(self):
+		supplier = create_supplier(supplier_name="_Test Supplier")
+		company = "_Test Company"
+		if not frappe.db.exists("Company", company):
+			company = frappe.new_doc("Company")
+			company.company_name = company
+			company.country="India",
+			company.default_currency= "INR",
+			company.save()
+		else:
+			company = frappe.get_doc("Company", company) 
+		item = create_item("Test Item")
+		acc = frappe.new_doc("Account")
+		acc.account_name = "Environmental Cess a/c"
+		acc.parent_account = "Indirect Expenses - _TC"
+		acc.account_type = "Chargeable"
+		acc.company = company.name
+		account_name_cess = frappe.db.exists("Account", {"account_name": "Environmental Cess a/c", "company": company.name})
+		if not account_name_cess:
+			account_name_cess = acc.insert()
+		
+		acc = frappe.new_doc("Account")
+		acc.account_name = "Input Tax CGST"
+		acc.parent_account = "Tax Assets - _TC"
+		acc.company = company.name
+		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax CGST","company": company.name })
+		if not account_name:
+			account_name = acc.insert()
+		
+		acc = frappe.new_doc("Account")
+		acc.account_name = "Input Tax SGST"
+		acc.parent_account = "Tax Assets - _TC"
+		acc.company = company.name
+		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax SGST","company": company.name })
+		if not account_name:
+			account_name = acc.insert()
+
+		taxes = create_taxes_interstate()
+		taxes.append({
+			"charge_type": "On Previous Row Total",
+			"account_head": account_name_cess,
+			"rate": 5,
+			"description": "Environmental Cess",
+			"row_id":2,
+			"category": "Total"
+		}
+		)
+		po_data = {
+			"company": company.name,
+			"supplier": supplier.name,
+			"warehouse": create_warehouse("Stores - _TC", company=company.name),
+			"item_code": item.item_code,
+			"qty": 10,
+			"rate": 100,
+			"do_not_submit" : 1
+		}
+		doc_po = create_purchase_order(**po_data)
+		for tax in taxes:
+			doc_po.append("taxes", tax)
+		doc_po.save()
+		doc_po.submit()
+		self.assertEqual(doc_po.grand_total, 1239)
+		pr = make_pr_for_po(doc_po.name, received_qty=10)
+		self.assertEqual(pr.items[0].received_qty, 10)
+		self.assertEqual(pr.items[0].rate, 100)
+		make_pi_against_pr(pr.name)
+
 	def test_po_pr_pi_with_shipping_rule_TC_B_064(self):
 		# Scenario : PO=>PR=>PI [With Shipping Rule]
 		args = {
