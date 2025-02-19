@@ -10,6 +10,7 @@ from frappe.model.document import Document
 from frappe.model.mapper import get_mapped_doc
 from frappe.query_builder import Case
 from frappe.query_builder.functions import Sum
+from frappe.tests.utils import if_app_installed
 from frappe.utils import (
 	cint,
 	date_diff,
@@ -1428,7 +1429,8 @@ def make_stock_entry(work_order_id, purpose, qty=None, target_warehouse=None):
 
 	if purpose == "Material Transfer for Manufacture":
 		stock_entry.to_warehouse = wip_warehouse
-		stock_entry.project = work_order.project
+		if if_app_installed("Projects"):
+			stock_entry.project = work_order.project
 	else:
 		stock_entry.from_warehouse = (
 			work_order.source_warehouse
@@ -1436,7 +1438,8 @@ def make_stock_entry(work_order_id, purpose, qty=None, target_warehouse=None):
 			else wip_warehouse
 		)
 		stock_entry.to_warehouse = work_order.fg_warehouse
-		stock_entry.project = work_order.project
+		if if_app_installed("Projects"):
+			stock_entry.project = work_order.project
 
 	if purpose == "Disassemble":
 		stock_entry.from_warehouse = work_order.fg_warehouse
