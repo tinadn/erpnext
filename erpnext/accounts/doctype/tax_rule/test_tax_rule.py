@@ -316,10 +316,14 @@ class TestTaxRule(unittest.TestCase):
 	
 	def test_create_tax_rule_and_apply_to_purchase_invoice_TC_ACC_102(self):
 		# Step 1: Create a tax rule for a supplier with a sales tax template
+		existing_templates = frappe.db.get_value(
+			"Purchase Taxes and Charges Template",
+			filters={"company":"_Test Company","title": ["like", "% GST %"]}
+		)
 		make_tax_rule(
 			tax_type= "Purchase",
 			supplier="_Test Supplier",
-			purchase_tax_template="Input GST Out-state - _TC",
+			purchase_tax_template=existing_templates,
 			save=1,
 		)
 
@@ -335,7 +339,7 @@ class TestTaxRule(unittest.TestCase):
 		# Step 4: Assert that the correct tax template is applied based on the supplier's tax rule
 		self.assertEqual(
 			applied_tax_template,
-			"Input GST Out-state - _TC",
+			existing_templates,
 		)
 
 

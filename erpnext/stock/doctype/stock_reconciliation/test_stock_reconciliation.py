@@ -1583,6 +1583,51 @@ class TestStockReconciliation(FrappeTestCase, StockTestMixin):
 		)
 		self.assertEqual(flt(sle[0]['actual_qty'], 1), flt(cancel_sle[0]['qty_after_transaction'], 1))
 		self.assertEqual(flt(cancel_sle[0]['actual_qty'], 1), -100)
+
+	def test_stock_reco_for_serial_item_TC_SCK_146(self):
+		from erpnext.stock.doctype.item.test_item import make_item
+		from erpnext.stock.doctype.stock_entry.test_stock_entry import create_company
+		company = "_Test Company"
+		create_company(company)
+		
+		app_name = "india_compliance"
+		item_fields = {
+				"item_name" : "_Test Item146",
+				"valuation_rate" : 500,
+				"has_serial_no": 1,
+				"serial_no_series": "Test-SABBMRP-Sno.#####",
+			}
+		hsn_code = "888890"
+		
+		if app_name in frappe.get_installed_apps():
+			if not frappe.db.exists("GST HSN Code", '888890'):
+					frappe.get_doc({
+						"doctype": 'GST HSN Code',
+						"hsn_code": '888890',
+						"description": 'test'
+					}).insert()
+					
+			item_fields["gst_hsn_code"] = hsn_code	
+
+		item = make_item("_Test Item146", item_fields)
+
+		stock_reco = create_stock_reconciliation(
+			item_code=item.name,
+			qty=5,
+			posting_date="2025-01-03",
+			purpose="Stock Reconciliation",
+			warehouse=create_warehouse("Stores-test", properties=None, company="_Test Company"),
+			expense_account="Stock Adjustment - _TC",
+		)
+		self.assertIsNotNone(stock_reco.name)
+		self.assertEqual(stock_reco.docstatus, 1)
+		serial_nos = frappe.db.get_list("Serial No", 
+            filters={"item_code": item.name},
+            fields=["name", "status"]
+        )
+        
+		for serial in serial_nos:
+			self.assertEqual(serial["status"], "Active", f"Serial No {serial['name']} is not Active")
 		
 def create_stock_reconciliation_for_opening():
 	item1 = create_item("OP-MB-001")

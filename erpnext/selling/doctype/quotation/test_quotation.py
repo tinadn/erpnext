@@ -2,7 +2,7 @@
 # License: GNU General Public License v3. See license.txt
 
 import frappe
-from frappe.tests.utils import FrappeTestCase
+from frappe.tests.utils import FrappeTestCase, if_app_installed
 from frappe.utils import add_days, add_months, flt, getdate, nowdate
 
 
@@ -1121,11 +1121,12 @@ class TestQuotation(FrappeTestCase):
 		self.assertEqual(sales_order.status, "To Bill")
 		self.assertEqual(purchase_orders[0].status, "Delivered")
 
+	@if_app_installed("india_compliance")
 	def test_quotation_to_po_with_drop_ship_with_GST_TC_S_112(self):
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.selling.doctype.sales_order.sales_order import make_purchase_order_for_default_supplier
 		from erpnext.buying.doctype.purchase_order.purchase_order import update_status
-
+		from erpnext.selling.doctype.sales_order.test_sales_order import (create_test_tax_data, test_item_tax_template)
 		make_item("_Test Item for Drop Shipping", {"is_stock_item": 1, "delivered_by_supplier": 1})
 		so_items = [
 			{
@@ -1136,6 +1137,10 @@ class TestQuotation(FrappeTestCase):
 				"delivered_by_supplier": 1,
 				"supplier": "_Test Supplier",
 			}]
+
+		create_test_tax_data()
+		if not frappe.db.exists("Item Tax Template", "GST 18% - _TC"):
+			test_item_tax_template(company="_Test Company", gst_rate=18,title="GST 18%")
 
 		quotation = make_quotation(item="_Test Item for Drop Shipping", qty=1, rate=5000, warehouse="Stores - _TC",do_not_save =1)
 		for i in quotation.items:
@@ -1236,13 +1241,14 @@ class TestQuotation(FrappeTestCase):
 		self.assertEqual(si.status, "Unpaid")
 		self.validate_gl_entries(voucher_no= si.name,amount= 5000)
 
-
+	@if_app_installed("india_compliance")
 	def test_quotation_to_si_with_pi_and_drop_ship_with_GST_TC_S_116(self):
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.selling.doctype.sales_order.sales_order import make_sales_invoice
 		from erpnext.selling.doctype.sales_order.sales_order import make_purchase_order_for_default_supplier
 		from erpnext.buying.doctype.purchase_order.purchase_order import update_status
 		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice as make_pi_from_po
+		from erpnext.selling.doctype.sales_order.test_sales_order import (create_test_tax_data, test_item_tax_template)
 		make_item("_Test Item for Drop Shipping", {"is_stock_item": 1, "delivered_by_supplier": 1})
 		so_items = [
 			{
@@ -1253,6 +1259,10 @@ class TestQuotation(FrappeTestCase):
 				"delivered_by_supplier": 1,
 				"supplier": "_Test Supplier",
 			}]
+
+		create_test_tax_data()
+		if not frappe.db.exists("Item Tax Template", "GST 18% - _TC"):
+			test_item_tax_template(company="_Test Company", gst_rate=18,title="GST 18%")
 
 		quotation = make_quotation(item="_Test Item for Drop Shipping", qty=1, rate=5000, warehouse="Stores - _TC",do_not_save =1)
 		for i in quotation.items:

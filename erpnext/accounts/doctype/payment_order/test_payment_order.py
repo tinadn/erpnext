@@ -49,86 +49,40 @@ class TestPaymentOrder(FrappeTestCase):
 		self.assertEqual(reference_doc.amount, 250)
 
 	def test_payment_order_for_purchase_invoice_TC_ACC_121(self):
-		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
-			create_purchase_invoice,
-			make_test_item,
-		)
 		from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import check_gl_entries
 		from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
 		from erpnext.accounts.doctype.payment_order.payment_order import make_payment_records
-
-		if not frappe.db.exists("Account", "_Test Bank1 - _TC"):
-			frappe.get_doc(
-				{
-					"doctype": "Account",
-					"account_type": "Bank",
-					"account_name": "_Test Bank1",
-					"company": "_Test Company",
-					"parent_account": "Bank Accounts - _TC",
-				}
-			).insert(ignore_permissions=True)
-		if not frappe.db.exists("Bank", "_Test Bank ICIC"):
-			bank=frappe.get_doc({
-				"doctype": "Bank",
-				"bank_name": "_Test Bank ICIC",
-				"swift_number": "SWIFT12356",
-			}).insert(ignore_permissions=True)
-		
-		if not frappe.db.exists("Bank Account", "_Test Account - _Test Bank ICIC"):
-			bank = frappe.get_doc("Bank", "_Test Bank ICIC")
-			bank_account=frappe.get_doc({
-				"doctype": "Bank Account",
-				"bank": bank.name,
-				"account_name": "_Test Account",
-				"is_company_account":1,
-				"company": "_Test Company"
-			}).insert(ignore_permissions=True)
-		bank_account=frappe.get_doc("Bank Account", "_Test Account - _Test Bank ICIC")
-		if not bank_account.is_company_account and bank_account.company != "_Test Company":
-			bank_account.is_company_account=1
-			bank_account.company="_Test Company"
-			bank_account.save()
-		if not bank_account.account:
-			bank_account.account = "_Test Bank1 - _TC"
-			bank_account.save()
-		item = make_test_item("_Test Item")
-
-		purchase_invoice = create_purchase_invoice(
-			company="_Test Company",
-			supplier="_Test Supplier",
-			item_code=item.name,
-			qty=1,
-			rate=1000,
-		)
-		purchase_invoice.submit()
-		pe=pe=make_payment_request(
+		# Step 1: Create a Purchase Invoice
+		purchase_invoice = make_purchase_invoice()	
+		# Step 2: Create a Payment Request
+		payment_request=make_payment_request(
 			dt="Purchase Invoice",
 			dn=purchase_invoice.name,
 			return_doc=1,
 		)
-		pe.is_payment_order_required=1
-		pe.bank_account=bank_account.name
-		pe.save()
-		pe.submit()
+		payment_request.is_payment_order_required=1
+		payment_request.save()
+		payment_request.submit()
 
-		doc = frappe.get_doc({
+		# Step 3: Create a Payment Order
+		payment_order = frappe.get_doc({
 			"doctype": "Payment Order",
 			"company": "_Test Company",
 			"payment_order_type": "Payment Entry",
-			"company_bank_account": bank_account.name,
+			"company_bank_account": self.bank_account,
 			"references": [
 				{
 					"reference_doctype": "Purchase Invoice",
 					"reference_name": purchase_invoice.name,
 					"supplier": "_Test Supplier",
-					"amount": pe.grand_total,
-					"payment_request": pe.name,
-					"bank_account": bank_account.name
+					"amount": payment_request.grand_total,
+					"payment_request": payment_request.name,
+					"bank_account": self.bank_account
 				}
 			]
-		}).insert()
-		doc.save().submit()
-		make_payment_records(doc.name, "_Test Supplier")
+		}).insert().save().submit()
+
+		make_payment_records(payment_order.name, "_Test Supplier")
 		jv_name=frappe.get_value('Journal Entry Account', {'reference_type': "Purchase Invoice", 'reference_name': purchase_invoice.name}, 'parent')
 		if jv_name:
 			jv_doc=frappe.get_doc("Journal Entry", jv_name)
@@ -139,9 +93,10 @@ class TestPaymentOrder(FrappeTestCase):
 				accounts.cost_center="Main - _TC"
 			jv_doc.save()	
 			jv_doc.submit()
+
 		expected_accounts = [
 				['Creditors - _TC', jv_doc.total_debit, 0.0,jv_doc.posting_date],
-				['_Test Bank1 - _TC', 0.0, jv_doc.total_credit,jv_doc.posting_date],
+				[self.gl_account, 0.0, jv_doc.total_credit,jv_doc.posting_date],
 			]
 		check_gl_entries(self,jv_doc.name,expected_accounts,jv_doc.posting_date,"Journal Entry")
 

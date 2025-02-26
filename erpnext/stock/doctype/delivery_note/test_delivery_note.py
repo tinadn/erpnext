@@ -2473,7 +2473,10 @@ class TestDeliveryNote(FrappeTestCase):
 			make_test_item
 		)
 		
-		make_test_item("_Test Item 1")
+		item= make_test_item("_Test Item 1")
+		item.is_stock_item = 1
+		item.save()
+		frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
 		make_stock_entry(item_code="_Test Item", qty=5, rate=1000, target="_Test Warehouse - _TC")
 		make_stock_entry(item_code="_Test Item 1", qty=5, rate=1000, target="_Test Warehouse - _TC")
 		dn = create_delivery_note(qty = 5, rate = 1000)

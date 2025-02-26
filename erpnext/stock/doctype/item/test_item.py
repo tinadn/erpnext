@@ -1046,12 +1046,159 @@ class TestItem(FrappeTestCase):
 		if frappe.db.exists("Item Group", 'Software'):
 			frappe.delete_doc("Item Group", 'Software')
 	
+	def test_cr_item_alternative_TC_SCK_150(self):
+		from erpnext.manufacturing.doctype.production_plan.test_production_plan import make_bom
+		from erpnext.manufacturing.doctype.work_order.test_work_order import make_wo_order_test_record
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		company = "_Test Company"
+		item_fields = {
+			"item_name": "_Test Item150",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+			"allow_alternative_item": 1
+		}
+		alt_item_fields = {
+			"item_name": "_Test Alt Item",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+			"allow_alternative_item": 1
+		}
+		bot_item_fields = {
+			"item_name": "_Test Bom Item",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+		}
+		item = make_item("_Test Item150", item_fields)
+		alt_item = make_item("_Test Alt Item", alt_item_fields)
+		bom_item = make_item("_Test Bom Item", bot_item_fields)
+
+		if not frappe.db.exists("Item Alternative", {"item_code": item.name, "alternative_item_code": alt_item.name}):
+			alt_1 = frappe.get_doc({
+				"doctype": "Item Alternative",
+				"item_code": item.name,
+				"alternative_item_code": alt_item.name,
+				"is_two_way": 1
+			})
+			alt_1.insert()
+
+		if not frappe.db.exists("Item Alternative", {"item_code": alt_item.name, "alternative_item_code": item.name}):
+			alt_2 = frappe.get_doc({
+				"doctype": "Item Alternative",
+				"item_code": alt_item.name,
+				"alternative_item_code": item.name,
+				"is_two_way": 1
+			})
+			alt_2.insert()
+
+		if not frappe.db.exists("BOM", {"item": item.name}):
+			bom = make_bom(
+			item=item.name,
+			company= company,
+			raw_materials=[bom_item.name, alt_item.name],
+			is_active=1,
+			is_default=1,
+			do_not_submit=True,
+		)
+		self.assertTrue(frappe.db.exists("BOM", bom.name))
+
+		wo = make_wo_order_test_record(company= company,production_item=item.name,bom_no=frappe.get_value("BOM", {"item": bom_item.name}, "name") ,qty=10)
+
+		wo.reload()
+		wo.alternate_item = alt_item.name
+		wo.save()
+		self.assertEqual(wo.alternate_item, alt_item.name, "Alternative item not found in Work Order")
+	
 	@change_settings("Stock Settings", {"valuation_method": "FIFO"})
 	def test_default_valuation_method_TC_SCK_180(self):
 		expected_valuation_method = "FIFO"
 		updated_stock_settings = frappe.get_doc("Stock Settings")
 		self.assertEqual(updated_stock_settings.valuation_method, expected_valuation_method, "Valuation method not set correctly in Stock Settings")
 
+	def test_create_stock_entry_with_batch_TC_SCK_155(self):
+		from datetime import datetime, timedelta
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		company = "_Test Company"
+		item_fields = {
+			"item_name": "_Test Item155",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+			"has_batch_no": 1,
+			"batch_number_series": "BATCH-Item-.####",
+			"create_new_batch": 1,
+			"has_expiry_date": 1,
+			"shelf_life_in_days": 365
+		}
+		item = make_item("_Test Item155", item_fields)
+		se = make_stock_entry(
+			item_code=item.name, target=create_warehouse("_Test Stores", company="_Test Company"), qty=10, purpose="Material Receipt"
+		)
+		expiry = se.posting_date + timedelta(days=365)
+		self.assertEqual(se.docstatus, 1, "Stock Entry not submitted successfully")
+        # Fetch batch details
+		batch = frappe.get_last_doc("Batch", filters={"item": item.name})
+		self.assertIsNotNone(batch, "Batch not created")
+		self.assertEqual(str(batch.expiry_date), str(expiry), "Expiry date mismatch in batch")
+
+	def test_cr_item_alternative_TC_SCK_149(self):
+		from erpnext.manufacturing.doctype.production_plan.test_production_plan import make_bom
+		from erpnext.manufacturing.doctype.work_order.test_work_order import make_wo_order_test_record
+		if not frappe.db.exists("Company", "_Test Company"):
+			company = frappe.new_doc("Company")
+			company.company_name = "_Test Company"
+			company.default_currency = "INR"
+			company.insert()
+		company = "_Test Company"
+		item_fields = {
+			"item_name": "_Test Item",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+		}
+		alt_item_fields = {
+			"item_name": "_Test Alt Item",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+			"allow_alternative_item": 1
+		}
+		bot_item_fields = {
+			"item_name": "_Test Bom Item",
+			"is_stock_item": 1,
+			"valuation_rate": 500,
+		}
+		item = make_item("_Test Item", item_fields)
+		alt_item = make_item("_Test Alt Item", alt_item_fields)
+		bom_item = make_item("_Test Bom Item", bot_item_fields)
+
+		if not frappe.db.exists("BOM", {"item": item.name}):
+			bom = make_bom(
+			item=item.name,
+			company= company,
+			raw_materials=[bom_item.name, alt_item.name],
+			is_active=1,
+			is_default=1,
+			do_not_submit=True,
+		)
+		self.assertTrue(frappe.db.exists("BOM", bom.name))
+		bom = frappe.get_list("BOM", filters={"item": item.name, "is_active": 1}, limit_page_length=1)
+		self.assertGreater(len(bom), 0, "BOM not found for the item")
+
+		wo = make_wo_order_test_record(company= company,production_item=item.name,bom_no=bom[0].name ,qty=10)
+
+		wo_items = frappe.get_doc("Work Order", wo.name).required_items
+		alt_item_found = any(item.item_code == alt_item.name for item in wo_items)
+		self.assertTrue(alt_item_found, "Alternative item not found in Work Order")
+
+		wo.submit()
+		self.assertTrue(frappe.db.exists("Work Order", wo.name))
+		self.assertEqual(wo.alternate_item, alt_item.name, "Alternative item not found in Work Order")
 
 def set_item_variant_settings(fields):
 	doc = frappe.get_doc("Item Variant Settings")

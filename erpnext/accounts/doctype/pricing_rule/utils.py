@@ -227,7 +227,14 @@ def _get_tree_conditions(args, parenttype, table, allow_blank=True):
 
 
 def get_other_conditions(conditions, values, args):
-	for field in ["company", "customer", "supplier", "campaign", "sales_partner"]:
+	fields = ["company", "customer", "supplier"]
+	installed_apps = frappe.get_installed_apps()
+	if "CRM" in installed_apps:
+		fields.append("campaign")
+	if "Sales Commission" in installed_apps:
+		fields.append("sales_partner")
+
+	for field in fields:
 		if args.get(field):
 			conditions += f" and ifnull(`tabPricing Rule`.{field}, '') in (%({field})s, '')"
 			values[field] = args.get(field)

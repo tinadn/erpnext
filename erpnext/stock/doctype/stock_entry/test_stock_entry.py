@@ -3825,6 +3825,119 @@ class TestStockEntry(FrappeTestCase):
 			elif sle['item_code'] == item_3.name:
 				self.assertEqual(sle['actual_qty'], 10)
 	
+
+	@change_settings("Stock Settings", {"auto_create_serial_and_batch_bundle_for_outward": 1, "disable_serial_no_and_batch_selector": 1, "use_serial_batch_fields": 1})
+	def test_material_issue_with_auto_batch_serial_TC_SCK_134(self):
+		from erpnext.stock.utils import get_bin
+		company = "_Test Company"
+		create_company(company)
+		item_fields = {
+			"item_name" : "_Test Item134",
+			"valuation_rate" : 500,
+			"has_batch_no": 1,
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SABBMRP-Sno.#####",
+			"create_new_batch": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####"
+		}
+		self.item_code = make_item("_Test Item134", item_fields).name
+		self.source_warehouse = create_warehouse("Stores-test", properties=None, company="_Test Company")
+		self.qty = 5
+		bin = get_bin(self.item_code, self.source_warehouse)
+		stock_qty = frappe.db.get_value("Bin", bin, "actual_qty")
+		if not stock_qty or stock_qty < self.qty:
+            # Create a stock entry to add stock if needed
+			se = make_stock_entry(item_code=self.item_code, qty=10, to_warehouse=self.source_warehouse, purpose="Material Receipt")
+		se_req = make_stock_entry(item_code=self.item_code, qty=self.qty, from_warehouse=self.source_warehouse, purpose="Material Issue")
+		submitted_se = frappe.get_doc("Stock Entry", se_req.name)
+		self.assertTrue(submitted_se.docstatus == 1, "Stock Entry should be submitted.")
+		
+		for item in submitted_se.items:
+			self.assertTrue(item.serial_and_batch_bundle, "Batch should be auto-assigned.")
+		batch_no = frappe.db.get_value("Serial and Batch Entry", {"parent": submitted_se.items[0].serial_and_batch_bundle}, "batch_no")
+			
+		# Validate Stock Ledger
+		sle_exists = frappe.db.exists("Stock Ledger Entry", {"voucher_no": se.name})
+		self.assertTrue(sle_exists, "Stock Ledger Entry should be created.")
+		
+		# Validate Serial / Batch Number tracking
+		batch_exists = frappe.db.exists("Batch", {"batch_id": batch_no})
+		self.assertTrue(batch_exists, "Batch should exist in the system.")
+
+	@change_settings("Stock Settings", {"auto_create_serial_and_batch_bundle_for_outward": 1, "disable_serial_no_and_batch_selector": 1, "use_serial_batch_fields": 1})
+	def test_material_issue_with_auto_batch_serial_TC_SCK_135(self):
+		from erpnext.stock.utils import get_bin
+		company = "_Test Company"
+		create_company(company)
+		
+		item_fields1 = {
+			"item_name" : "_Test Item1351",
+			"valuation_rate" : 500,
+			"has_batch_no": 1,
+			"has_serial_no": 1,
+			"serial_no_series": "Test-SABBMRP-Sno.#####",
+			"create_new_batch": 1,
+			"batch_number_series": "Test-SABBMRP-Bno.#####"
+		}
+		item_fields2 = {
+			"item_name" : "_Test Item1352",
+			"valuation_rate" : 500,
+			"has_batch_no": 1,
+			"has_serial_no": 1,
+			"serial_no_series": "Test1-SABBMRP-Sno.#####",
+			"create_new_batch": 1,
+			"batch_number_series": "Test1-SABBMRP-Bno.#####"
+		}
+		self.item_code1 = make_item("_Test Item134", item_fields1).name
+		self.item_code2 = make_item("_Test Item135", item_fields2).name
+		self.source_warehouse = create_warehouse("Stores-test", properties=None, company="_Test Company")
+		self.qty = 5
+		bin1 = get_bin(self.item_code1, self.source_warehouse)
+		stock_qty1 = frappe.db.get_value("Bin", bin1, "actual_qty")
+		bin2 = get_bin(self.item_code2, self.source_warehouse)
+		stock_qty2 = frappe.db.get_value("Bin", bin2, "actual_qty")
+		if not stock_qty1 or stock_qty1 < self.qty :
+            # Create a stock entry to add stock if needed
+			se = make_stock_entry(item_code=self.item_code1, qty=10, to_warehouse=self.source_warehouse, purpose="Material Receipt")
+		if not stock_qty2 or stock_qty2 < self.qty :
+            # Create a stock entry to add stock if needed
+			se = make_stock_entry(item_code=self.item_code2, qty=10, to_warehouse=self.source_warehouse, purpose="Material Receipt")
+		se_req = frappe.new_doc("Stock Entry")
+		se_req.stock_entry_type = "Material Issue"
+		se_req.posting_date = "2025-01-03"
+		se_req.company = "_Test Company"
+		se_req.append("items", {
+                "item_code": self.item_code1,
+                "s_warehouse": self.source_warehouse,
+                "qty": self.qty
+            })
+		se_req.append("items", {
+                "item_code": self.item_code2,
+                "s_warehouse": self.source_warehouse,
+                "qty": self.qty
+            })
+		se_req.insert()
+		se_req.submit()
+		submitted_se = frappe.get_doc("Stock Entry", se_req.name)
+		self.assertTrue(submitted_se.docstatus == 1, "Stock Entry should be submitted.")
+		
+		for item in submitted_se.items:
+			self.assertTrue(item.serial_and_batch_bundle, "Batch should be auto-assigned.")
+		batch_no1 = frappe.db.get_value("Serial and Batch Entry", {"parent": submitted_se.items[0].serial_and_batch_bundle}, "batch_no")
+		batch_no2 = frappe.db.get_value("Serial and Batch Entry", {"parent": submitted_se.items[1].serial_and_batch_bundle}, "batch_no")
+		print(submitted_se.items[0].item_name, submitted_se.items[1].item_name)
+			
+		# Validate Stock Ledger
+		sle_exists = frappe.db.exists("Stock Ledger Entry", {"voucher_no": se.name})
+		self.assertTrue(sle_exists, "Stock Ledger Entry should be created.")
+		
+		# Validate Serial / Batch Number tracking
+		batch_exists1 = frappe.db.exists("Batch", {"batch_id": batch_no1})
+		self.assertTrue(batch_exists1, "Batch should exist in the system.")
+		batch_exists = frappe.db.exists("Batch", {"batch_id": batch_no2})
+		self.assertTrue(batch_exists, "Batch should exist in the system.")
+            
+
 def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
 		bom = frappe.new_doc("BOM")
 		bom.update(
@@ -3982,3 +4095,10 @@ def initialize_records_for_future_negative_sle_test(
 def create_stock_entries(sequence_of_entries):
 	for entry_detail in sequence_of_entries:
 		make_stock_entry(**entry_detail)
+
+def create_company(company):
+	if not frappe.db.exists("Company", company):
+		company = frappe.new_doc("Company")
+		company.company_name = company
+		company.default_currency = "INR"
+		company.insert()

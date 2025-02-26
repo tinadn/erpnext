@@ -1117,64 +1117,69 @@ def get_bom_items_as_dict(
 	fetch_qty_in_stock_uom=True,
 ):
 	item_dict = {}
-	project_column = "bom.project," if "projects" in frappe.get_installed_apps() else ""
- 
-	# Did not use qty_consumed_per_unit in the query, as it leads to rounding loss
+
+	# Add project column if "projects" app is installed
+	project_column = ", bom.project" if "projects" in frappe.get_installed_apps() else ""
+	project_group_by = "bom.project," if project_column else ""
+
+	# Base SQL Query
+	
 	query = """select
 				bom_item.item_code,
 				bom_item.idx,
 				item.item_name,
-				sum(bom_item.{qty_field}/ifnull(bom.quantity, 1)) * %(qty)s as qty,
-				item.image,
-				{project_column}
+				SUM(bom_item.{qty_field} / COALESCE(bom.quantity, 1)) * %(qty)s AS qty,
+				item.image
+				{project_column},
 				bom_item.rate,
-				sum(bom_item.{qty_field}/ifnull(bom.quantity, 1)) * bom_item.rate * %(qty)s as amount,
+				SUM(bom_item.{qty_field} / COALESCE(bom.quantity, 1)) * bom_item.rate * %(qty)s AS amount,
 				item.stock_uom,
 				item.item_group,
 				item.allow_alternative_item,
 				item_default.default_warehouse,
-				item_default.expense_account as expense_account,
-				item_default.buying_cost_center as cost_center
+				item_default.expense_account AS expense_account,
+				item_default.buying_cost_center AS cost_center
 				{select_columns}
-			from
-				`tab{table}` bom_item
-				JOIN `tabBOM` bom ON bom_item.parent = bom.name
-				JOIN `tabItem` item ON item.name = bom_item.item_code
-				LEFT JOIN `tabItem Default` item_default
-					ON item_default.parent = item.name and item_default.company = %(company)s
-			where
+			FROM `tab{table}` bom_item
+			JOIN `tabBOM` bom ON bom_item.parent = bom.name
+			JOIN `tabItem` item ON item.name = bom_item.item_code
+			LEFT JOIN `tabItem Default` item_default
+				ON item_default.parent = item.name AND item_default.company = %(company)s
+			WHERE
 				bom_item.docstatus < 2
-				and bom.name = %(bom)s
-				and item.is_stock_item in (1, {is_stock_item})
+				AND bom.name = %(bom)s
+				AND item.is_stock_item IN (1, {is_stock_item})
 				{where_conditions}
-				group by bom_item.item_code,
+			GROUP BY bom_item.item_code,
 				bom_item.idx,
-                item.item_name,
-                item.image,
-				{project_column}
-                bom_item.rate,
-                item.stock_uom,
-                item.item_group,
-                item.allow_alternative_item,
-                item_default.default_warehouse,
-                item_default.expense_account,
-                item_default.buying_cost_center,
+				item.item_name,
+				item.image,
+				{project_group_by}
+				bom_item.rate,
+				item.stock_uom,
+				item.item_group,
+				item.allow_alternative_item,
+				item_default.default_warehouse,
+				item_default.expense_account,
+				item_default.buying_cost_center
 				{group_by_fields}
-			order by bom_item.idx"""
+			ORDER BY bom_item.idx"""
 
 	is_stock_item = 0 if include_non_stock_items else 1
+
 	if cint(fetch_exploded):
 		query = query.format(
 			table="BOM Explosion Item",
-			group_by_fields = """bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.description,
-                bom_item.sourced_by_supplier""",
+			group_by_fields=", bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.description, bom_item.sourced_by_supplier",
 			where_conditions="",
 			is_stock_item=is_stock_item,
 			qty_field="stock_qty",
 			project_column=project_column,
-			select_columns=""", bom_item.source_warehouse, bom_item.operation,
+			project_group_by=project_group_by,  # FIXED: Explicitly passing this value
+			select_columns=""",
+				bom_item.source_warehouse, bom_item.operation,
 				bom_item.include_item_in_manufacturing, bom_item.description, bom_item.rate, bom_item.sourced_by_supplier,
-				(Select idx from `tabBOM Item` where item_code = bom_item.item_code and parent = %(parent)s limit 1) bom_itm_idx""",
+				(SELECT idx FROM `tabBOM Item` WHERE item_code = bom_item.item_code AND parent = %(parent)s LIMIT 1) AS bom_itm_idx""",
 		)
 
 		items = frappe.db.sql(
@@ -1183,29 +1188,31 @@ def get_bom_items_as_dict(
 	elif fetch_scrap_items:
 		query = query.format(
 			table="BOM Scrap Item",
-			group_by_fields = """item.description""",
+			group_by_fields=", item.description",
 			where_conditions="",
 			select_columns=", item.description",
 			is_stock_item=is_stock_item,
 			qty_field="stock_qty",
 			project_column=project_column,
+			project_group_by=project_group_by,  # FIXED: Explicitly passing this value
 		)
 
 		items = frappe.db.sql(query, {"qty": qty, "bom": bom, "company": company}, as_dict=True)
 	else:
 		query = query.format(
 			table="BOM Item",
-			group_by_fields = """bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.uom, bom_item.conversion_factor, bom_item.description,
-                bom_item.sourced_by_supplier, bom_item.base_rate""",
+			group_by_fields=", bom_item.source_warehouse, bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.uom, bom_item.conversion_factor, bom_item.description, bom_item.sourced_by_supplier, bom_item.base_rate",
 			where_conditions="",
 			is_stock_item=is_stock_item,
 			qty_field="stock_qty" if fetch_qty_in_stock_uom else "qty",
 			project_column=project_column,
-			select_columns=""", bom_item.uom, bom_item.conversion_factor, bom_item.source_warehouse,
+			project_group_by=project_group_by,  # FIXED: Explicitly passing this value
+			select_columns=""",
+				bom_item.uom, bom_item.conversion_factor, bom_item.source_warehouse,
 				bom_item.operation, bom_item.include_item_in_manufacturing, bom_item.sourced_by_supplier,
-				bom_item.description, bom_item.base_rate as bom_rate""",
+				bom_item.description, bom_item.base_rate AS bom_rate""",
 		)
-		
+
 		items = frappe.db.sql(query, {"qty": qty, "bom": bom, "company": company}, as_dict=True)
 
 	for item in items:

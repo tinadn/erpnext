@@ -774,10 +774,25 @@ class TestJournalEntry(unittest.TestCase):
 	def test_payment_of_gst_tds_TC_ACC_054(self):
 		# Set up input parameters
 		entry_type = "Journal Entry"
-		debit_account = "Input Tax IGST - _TC"
 		credit_account = "_Test Bank - _TC"
 		amount = 20000.0
+		tax_accounts = frappe.get_all(
+			"Account",
+			filters={"company":"_Test Company","account_type": "Tax", "parent_account": ["like", "%Assets%"]},
+			fields=["name"]
+		)
 
+		# Identify SGST and CGST accounts based on their name
+		debit_account = None
+		debit_account_cgst = None
+
+		for account in tax_accounts:
+			if "IGST" in account["name"]:
+				debit_account = account["name"]
+
+		# Ensure both SGST and CGST accounts are found
+		if not debit_account:
+			self.fail(f"Could not find IGST account: {tax_accounts}")
 		# Create the Journal Entry using the existing function
 		jv = make_journal_entry(
 			account1=debit_account,
@@ -995,11 +1010,30 @@ class TestJournalEntry(unittest.TestCase):
 	def test_reversal_of_itc_TC_ACC_059(self):
 		# Set up input parameters
 		entry_type = "Reversal of ITC"
-		debit_account_sgst = "Input Tax SGST - _TC"
-		debit_account_cgst = "Input Tax CGST - _TC"
 		credit_account = "Creditors - _TC"
 		amount_sgst = 5000.0
 		amount_cgst = 5000.0
+
+		# Fetch Tax Accounts dynamically
+		tax_accounts = frappe.get_all(
+			"Account",
+			filters={"company":"_Test Company","account_type": "Tax", "parent_account": ["like", "%Assets%"]},
+			fields=["name"]
+		)
+
+		# Identify SGST and CGST accounts based on their name
+		debit_account_sgst = None
+		debit_account_cgst = None
+
+		for account in tax_accounts:
+			if "SGST" in account["name"]:
+				debit_account_sgst = account["name"]
+			elif "CGST" in account["name"]:
+				debit_account_cgst = account["name"]
+
+		# Ensure both SGST and CGST accounts are found
+		if not debit_account_sgst or not debit_account_cgst:
+			self.fail(f"Could not find SGST or CGST accounts. Found: {tax_accounts}")
 
 		# Create the Journal Entry
 		jv = frappe.new_doc("Journal Entry")
@@ -1323,6 +1357,8 @@ class TestJournalEntry(unittest.TestCase):
 		self.check_gl_entries()
   
 	def test_opening_entry_TC_ACC_116(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_records
+		create_records("_Test Supplier")
 		jv = frappe.get_doc({
 			"doctype": "Journal Entry",
 			"voucher_type": "Opening Entry",

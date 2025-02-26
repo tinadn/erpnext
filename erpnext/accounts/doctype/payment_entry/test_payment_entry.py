@@ -18,11 +18,7 @@ from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import (
 	make_purchase_invoice,
 	make_purchase_invoice_against_cost_center,
 )
-from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import (
-	create_sales_invoice,
-	create_sales_invoice_against_cost_center,
-)
-from erpnext.selling.doctype.sales_order.test_sales_order import make_sales_order
+
 from erpnext.setup.doctype.employee.test_employee import make_employee
 import frappe.utils
 
@@ -2398,3 +2394,189 @@ def create_company():
 			"abbr":"_TC"
 		}).insert(ignore_permissions=True)
 		
+def create_sales_invoice(**args):
+	from erpnext.stock.doctype.serial_and_batch_bundle.test_serial_and_batch_bundle import (
+	make_serial_batch_bundle,
+	)
+	si = frappe.new_doc("Sales Invoice")
+	args = frappe._dict(args)
+	if args.posting_date:
+		si.set_posting_time = 1
+	si.posting_date = args.posting_date or nowdate()
+
+	si.company = args.company or "_Test Company"
+	si.customer = args.customer or "_Test Customer"
+	si.debit_to = args.debit_to or "Debtors - _TC"
+	si.update_stock = args.update_stock
+	si.is_pos = args.is_pos
+	si.is_return = args.is_return
+	si.return_against = args.return_against
+	si.currency = args.currency or "INR"
+	si.conversion_rate = args.conversion_rate or 1
+	si.naming_series = args.naming_series or "T-SINV-"
+	si.cost_center = args.parent_cost_center
+	si.shipping_rule = args.shipping_rule
+
+	bundle_id = None
+	if si.update_stock and (args.get("batch_no") or args.get("serial_no")):
+		batches = {}
+		qty = args.qty or 1
+		item_code = args.item or args.item_code or "_Test Item"
+		if args.get("batch_no"):
+			batches = frappe._dict({args.batch_no: qty})
+
+		serial_nos = args.get("serial_no") or []
+
+		bundle_id = make_serial_batch_bundle(
+			frappe._dict(
+				{
+					"item_code": item_code,
+					"warehouse": args.warehouse or "_Test Warehouse - _TC",
+					"qty": qty,
+					"batches": batches,
+					"voucher_type": "Sales Invoice",
+					"serial_nos": serial_nos,
+					"type_of_transaction": "Outward" if not args.is_return else "Inward",
+					"posting_date": si.posting_date or frappe.utils.today(),
+					"posting_time": si.posting_time,
+					"do_not_submit": True,
+				}
+			)
+		).name
+
+	if args.item_list:
+		for item in args.item_list:
+			si.append("items", item)
+
+	else:
+		si.append(
+			"items",
+			{
+				"item_code": args.item or args.item_code or "_Test Item",
+				"item_name": args.item_name or "_Test Item",
+				"description": args.description or "_Test Item",
+				"warehouse": args.warehouse or "_Test Warehouse - _TC",
+				"target_warehouse": args.target_warehouse,
+				"qty": args.qty or 1,
+				"uom": args.uom or "Nos",
+				"stock_uom": args.uom or "Nos",
+				"rate": args.rate if args.get("rate") is not None else 100,
+				"price_list_rate": args.price_list_rate if args.get("price_list_rate") is not None else 100,
+				"income_account": args.income_account or "Sales - _TC",
+				"expense_account": args.expense_account or "Cost of Goods Sold - _TC",
+				"discount_account": args.discount_account or None,
+				"discount_amount": args.discount_amount or 0,
+				"asset": args.asset or None,
+				"cost_center": args.cost_center or "_Test Cost Center - _TC",
+				"conversion_factor": args.get("conversion_factor", 1),
+				"incoming_rate": args.incoming_rate or 0,
+				"serial_and_batch_bundle": bundle_id,
+			},
+		)
+
+	if not args.do_not_save:
+		si.insert()
+		if not args.do_not_submit:
+			si.submit()
+		else:
+			si.payment_schedule = []
+
+		si.load_from_db()
+	else:
+		si.payment_schedule = []
+
+	return si
+
+
+def create_sales_invoice_against_cost_center(**args):
+	si = frappe.new_doc("Sales Invoice")
+	args = frappe._dict(args)
+	if args.posting_date:
+		si.set_posting_time = 1
+	si.posting_date = args.posting_date or nowdate()
+
+	si.company = args.company or "_Test Company"
+	si.cost_center = args.cost_center or "_Test Cost Center - _TC"
+	si.customer = args.customer or "_Test Customer"
+	si.debit_to = args.debit_to or "Debtors - _TC"
+	si.update_stock = args.update_stock
+	si.is_pos = args.is_pos
+	si.is_return = args.is_return
+	si.return_against = args.return_against
+	si.currency = args.currency or "INR"
+	si.conversion_rate = args.conversion_rate or 1
+
+	si.append(
+		"items",
+		{
+			"item_code": args.item or args.item_code or "_Test Item",
+			"warehouse": args.warehouse or "_Test Warehouse - _TC",
+			"qty": args.qty or 1,
+			"rate": args.rate or 100,
+			"income_account": "Sales - _TC",
+			"expense_account": "Cost of Goods Sold - _TC",
+			"cost_center": args.cost_center or "_Test Cost Center - _TC",
+		},
+	)
+
+	if not args.do_not_save:
+		si.insert()
+		if not args.do_not_submit:
+			si.submit()
+		else:
+			si.payment_schedule = []
+	else:
+		si.payment_schedule = []
+
+	return si
+
+def make_sales_order(**args):
+	so = frappe.new_doc("Sales Order")
+	args = frappe._dict(args)
+	if args.transaction_date:
+		so.transaction_date = args.transaction_date
+
+	so.set_warehouse = ""  # no need to test set_warehouse permission since it only affects the client
+	so.company = args.company or "_Test Company"
+	so.customer = args.customer or "_Test Customer"
+	so.currency = args.currency or "INR"
+	so.po_no = args.po_no or ""
+	if args.selling_price_list:
+		so.selling_price_list = args.selling_price_list
+	if args.cost_center:
+		so.cost_center = args.cost_center
+
+	if "warehouse" not in args:
+		args.warehouse = "_Test Warehouse - _TC"
+
+	if args.item_list:
+		for item in args.item_list:
+			so.append("items", item)
+
+	else:
+		so.append(
+			"items",
+			{
+				"item_code": args.item or args.item_code or "_Test Item",
+				"warehouse": args.warehouse,
+				"qty": args.qty or 10,
+				"uom": args.uom or None,
+				"price_list_rate": args.price_list_rate or None,
+				"discount_percentage": args.discount_percentage or None,
+				"rate": args.rate or (None if args.price_list_rate else 100),
+				"against_blanket_order": args.against_blanket_order,
+			},
+		)
+
+	so.delivery_date = add_days(so.transaction_date, 10)
+
+	if not args.do_not_save:
+		so.insert()
+		if not args.do_not_submit:
+			so.submit()
+		else:
+			so.payment_schedule = []
+	else:
+		so.payment_schedule = []
+
+	return so

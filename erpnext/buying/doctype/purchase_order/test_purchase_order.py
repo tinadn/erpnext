@@ -2908,7 +2908,6 @@ class TestPurchaseOrder(FrappeTestCase):
 					"calculate_based_on" : "Fixed",
 					"shipping_amount" : 200
 				}
-		doc_shipping_rule = create_shipping_rule("Buying", "_Test Shipping Rule _TC", args)
 		item = create_item("_Test Item")
 		supplier = create_supplier(supplier_name="_Test Supplier PO")
 		company = "_Test Company"
@@ -2920,11 +2919,14 @@ class TestPurchaseOrder(FrappeTestCase):
 			company.save()
 		else:
 			company = frappe.get_doc("Company", company)
+		validate_fiscal_year(company.name)
+		create_warehouse("_Test Warehouse", company=company.name)
+		doc_shipping_rule = create_shipping_rule("Buying", "_Test Shipping Rule _TC", args)
 		po_data = {
 			"company" : company.name,
 			"supplier":supplier.name,
 			"item_code" : item.item_code,
-			"warehouse" : create_warehouse("Stores - _TC", company=company.name),
+			"warehouse" : create_warehouse("Stores", company=company.name),
 			"qty" : 1,
 			"rate" : 3000,
 			"shipping_rule" :doc_shipping_rule.name
@@ -3155,12 +3157,12 @@ class TestPurchaseOrder(FrappeTestCase):
 		self.assertEqual(po.items[0].rate, 130)
 
 	def test_po_pr_pi_multiple_flow_TC_B_065(self):
+		
 		# Scenario : PO=>2PR=>2PI 
 		args = {
 					"calculate_based_on" : "Fixed",
 					"shipping_amount" : 200
 				}
-		doc_shipping_rule = create_shipping_rule("Buying", "_Test Shipping Rule _TC", args)
 		item = create_item("_Test Item")
 		supplier = create_supplier(supplier_name="_Test Supplier PO")
 		company = "_Test Company"
@@ -3172,11 +3174,14 @@ class TestPurchaseOrder(FrappeTestCase):
 			company.save()
 		else:
 			company = frappe.get_doc("Company", company)
+		validate_fiscal_year(company.name)
+		create_warehouse("_Test Warehouse", company=company.name)
+		doc_shipping_rule = create_shipping_rule("Buying", "_Test Shipping Rule _TC", args)
 		po_data = {
 			"company" : company.name,
 			"supplier":supplier.name,
 			"item_code" : item.item_code,
-			"warehouse" : create_warehouse("Stores - _TC", company=company.name),
+			"warehouse" : create_warehouse("Stores", company=company.name),
 			"qty" : 4,
 			"rate" : 3000,
 			"shipping_rule" :doc_shipping_rule.name
@@ -3639,7 +3644,7 @@ class TestPurchaseOrder(FrappeTestCase):
 
 	def test_create_po_pr_return_pr_TC_SCK_178(self):
 		create_company()
-		create_fiscal_year()
+
 		supplier = create_supplier(supplier_name="_Test Supplier PO")
 		item = create_item("_Test PO")
 		warehouse = create_warehouse("_Test warehouse - _PO", company="_Test Company PO")
@@ -6722,6 +6727,98 @@ class TestPurchaseOrder(FrappeTestCase):
 		self.assertEqual(doc_pi_2.items[0].qty, 1)
 		self.assertEqual(doc_pi_2.items[0].rate, 100)
 
+	def test_multicurrecy_TC_B_099(self):
+		company = "_Test Company"
+		if not frappe.db.exists("Company", company):
+			company = frappe.new_doc("Company")
+			company.company_name = company
+			company.country="India",
+			company.default_currency= "INR",
+			company.save()
+		else:
+			company = frappe.get_doc("Company", company)
+		warehouse = create_warehouse("Stores - _TC", company=company.name)
+		supplier = create_supplier(supplier_name="_Test Supplier 123", default_currency="USD")
+		account = self.create_account("Creditors USD 12", company.name, "USD", "Accounts Payable - _TC")
+		if not [x for x in supplier.accounts if x.company == company.name]:
+			supplier.append("accounts", {"company": company.name, "account": account.name})
+			supplier.save()
+		bank_name = "Bank Of America"
+		bank = frappe.get_doc("Bank", bank_name) if frappe.db.exists("Bank", bank_name) else None
+		if not bank:
+			bank = frappe.new_doc("Bank")
+			bank.bank_name = bank_name
+			bank.insert()
+
+		bank_account_name = f"{bank_name} - {bank_name}"
+		if not frappe.db.exists("Bank Account", bank_account_name):
+			bank_account = frappe.new_doc("Bank Account")
+			bank_account.account_name = bank_name
+			bank_account.bank = bank.name
+			bank_account.account_type = "Current A/c"
+			bank_account.company = company.name
+			bank_account.is_company_account = 1
+			bank_account.insert()
+		else:
+			bank_account = frappe.get_doc("Bank Account", bank_account_name)
+
+		item = create_item("Testing-312")
+		po_doc = create_purchase_order(qty=10,company=company.name,supplier=supplier.name,item=item.item_code, warehouse=warehouse,rate=1.59, currency="USD", do_not_save=1)
+		po_doc.conversion_rate = 62.9
+		po_doc.save()
+		po_doc.submit()
+		self.assertEqual(po_doc.base_total, 1000.11)
+		pr = make_purchase_receipt(po_doc.name)
+		pr.save()
+		pr.submit()
+		self.assertEqual(pr.items[0].received_qty, 10)
+		self.assertEqual(pr.base_total, 1000.11) 
+		pi = make_purchase_invoice(pr.name)
+		pi.save()
+		pi.submit()
+		pr_gl_entries = frappe.get_all("GL Entry", filters={"voucher_no": pi.name}, fields=["account", "debit", "credit"])
+		for gl_entries_pr in pr_gl_entries:
+			if gl_entries_pr['account'] == "Stock In Hand - _TC":
+				self.assertEqual(gl_entries_pr['debit'], 1000.11)
+			elif gl_entries_pr['account'] == "Stock Received But Not Billed - _TC":
+				self.assertEqual(gl_entries_pr['credit'], 1000.11)
+
+		pe = get_payment_entry(pi.doctype, pi.name, bank_account=pi.credit_to)
+		pe.mode_of_payment = "Bank Draft"
+		pe.posting_date = add_days(today(), 1)
+		pe.bank_account = bank_account.name
+		pe.paid_from = "Cash - _TC"
+		pe.paid_from_account_currency = "INR"
+		pe.reference_no = "123"
+		pe.reference_date = nowdate()
+		pe.paid_to_account_currency = pi.currency
+		pe.source_exchange_rate = 60
+		pe.paid_amount = pi.grand_total
+		pe.save(ignore_permissions=True)
+		pe.submit()
+	
+		err = frappe.new_doc("Exchange Rate Revaluation")
+		err.company = company.name
+		err.posting_date = today()
+		accounts = err.get_accounts_data()
+		err.extend("accounts", accounts)
+		row = err.accounts[0]
+		row.new_exchange_rate = 60
+		row.new_balance_in_base_currency = flt(row.new_exchange_rate * flt(row.balance_in_account_currency))
+		row.gain_loss = row.new_balance_in_base_currency - flt(row.balance_in_base_currency)
+		err.set_total_gain_loss()
+		err = err.save().submit()
+
+		# Create JV for ERR
+		err_journals = err.make_jv_entries()
+		je = frappe.get_doc("Journal Entry", err_journals.get("revaluation_jv"))
+		je = je.submit()
+
+		je.reload()
+		self.assertEqual(je.voucher_type, "Exchange Rate Revaluation")
+		self.assertEqual(je.total_debit, 1000.11)
+		self.assertEqual(je.total_credit, 1000.11)
+
 	def test_po_with_environmental_cess_pr_pi_TC_B_138(self):
 		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
 		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_invoice
@@ -6958,7 +7055,9 @@ class TestPurchaseOrder(FrappeTestCase):
 				"account":"Administrative Expenses - _TC",
 				"budget_amount":10000
 			}]
-		}).insert().submit()
+		}).insert(ignore_permissions=1)
+		budget.load_from_db()
+		budget.submit()
   
 		item = make_test_item("_Test Item")
 		try:
@@ -6975,16 +7074,15 @@ class TestPurchaseOrder(FrappeTestCase):
 			po.items[0].expense_account = "Administrative Expenses - _TC"
 			po.items[0].cost_center = "_Test Write Off Cost Center - _TC"
 	
-			po.save().submit()
+			po.save()
+			po.load_from_db()
+			po.submit()
 		except Exception as e:
 			self.assertEqual(str(e),"""Annual Budget for Account Administrative Expenses - _TC against Cost Center _Test Write Off Cost Center - _TC is ₹ 10,000.00. It will be exceed by ₹ 1,000.00Total Expenses booked through - Actual Expenses - ₹ 0.00Material Requests - ₹ 0.00Unbilled Orders - ₹ 11,000.00""")
 
-			budget.cancel()
-			budget.load_from_db()
-			po.cancel()
-			po.load_from_db()
-			frappe.delete_doc("Budget", budget.name,force=1)
-			frappe.delete_doc("Purchase Order", po.name,force=1)
+			# frappe.delete_doc("Budget", budget.name,force=1)
+			# frappe.delete_doc("Purchase Order", po.name,force=1)
+		
 			
 	def test_warn_po_creation_when_value_exceeds_budget_TC_ACC_144(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
@@ -7008,8 +7106,9 @@ class TestPurchaseOrder(FrappeTestCase):
 				"account":"Administrative Expenses - _TC",
 				"budget_amount":10000
 			}]
-		}).insert().submit()
-  
+		}).insert(ignore_permissions=1)
+		budget.load_from_db()
+		budget.submit()
 		item = make_test_item("_Test Item")
 		
 		po = create_purchase_order(
@@ -7025,7 +7124,9 @@ class TestPurchaseOrder(FrappeTestCase):
 		po.items[0].expense_account = "Administrative Expenses - _TC"
 		po.items[0].cost_center = "_Test Write Off Cost Center - _TC"
 
-		po.save().submit()
+		po.save()
+		po.load_from_db()
+		po.submit()
 		budget_exceeded_found = False
 
 		for msg in frappe.get_message_log():
@@ -7035,12 +7136,9 @@ class TestPurchaseOrder(FrappeTestCase):
 					break  
 
 		self.assertTrue(budget_exceeded_found, "Budget exceeded message not found")
-		budget.cancel()
-		budget.load_from_db()
-		po.cancel()
-		po.load_from_db()
-		frappe.delete_doc("Budget", budget.name,force=1)
-		frappe.delete_doc("Purchase Order", po.name,force=1)
+		
+		# frappe.delete_doc("Budget", budget.name,force=1)
+		# frappe.delete_doc("Purchase Order", po.name,force=1)
 		
 	
 	def test_po_with_damage_claims_pr_pi_TC_B_140(self):
@@ -7406,6 +7504,7 @@ class TestPurchaseOrder(FrappeTestCase):
 			self.assertEqual(entry["debit"], expected_pi_entries.get(entry["account"], {}).get("debit", 0))
 			self.assertEqual(entry["credit"], expected_pi_entries.get(entry["account"], {}).get("credit", 0))
 
+
 	def test_single_po_pi_multi_pr_TC_SCK_122(self):
 		# Scenario : 1PO => 2PR => 1PI
 		
@@ -7442,7 +7541,6 @@ class TestPurchaseOrder(FrappeTestCase):
 		self.assertEqual(doc_pi.docstatus, 1)
 		self.assertEqual(doc_po.total_qty, doc_pi.total_qty)
 		self.assertEqual(doc_po.grand_total, doc_pi.grand_total)
-
 
 def create_po_for_sc_testing():
 	from erpnext.controllers.tests.test_subcontracting_controller import (
@@ -8034,3 +8132,15 @@ def get_gl_entries(voucher_no):
 
 def get_sle(voucher_no):
 	return frappe.get_all("Stock Ledger Entry", filters={"voucher_no": voucher_no}, fields=['actual_qty', 'item_code'])
+
+def validate_fiscal_year(company):
+	from erpnext.accounts.utils import get_fiscal_year
+	year = get_fiscal_year(today())
+	if len(year) >1:
+		fiscal_year = frappe.get_doc("Fiscal Year", year[0])
+		company_list = {d.company for d in fiscal_year.companies}
+
+		if company not in company_list:
+			fiscal_year.append("companies", {"company": company})
+			fiscal_year.save()
+		
