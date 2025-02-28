@@ -24,9 +24,17 @@ from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 
 class TestQualityInspection(FrappeTestCase):
 	def setUp(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 		super().setUp()
+		create_company()
+		create_warehouse(
+				warehouse_name="_Test Warehouse - _TC",
+				properties={"parent_warehouse": "All Warehouses - _TC"},
+				company="_Test Company",
+			)
 		create_item("_Test Item with QA")
 		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_delivery", 1)
+		
 
 	def test_qa_for_delivery(self):
 		make_stock_entry(
@@ -300,7 +308,30 @@ class TestQualityInspection(FrappeTestCase):
 		pr.cancel()
 
 	def test_qa_for_pi_TC_SCK_160(self):
-		pr = make_purchase_invoice(item_code="_Test Item with QA")
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
+		from erpnext.buying.doctype.supplier.test_supplier import create_supplier
+		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company
+		
+		create_company()
+		create_supplier(supplier_name="_Test Supplier",default_currency = "INR")
+		create_warehouse(
+				warehouse_name="_Test Warehouse 1 - _TC",
+				properties={"parent_warehouse": "All Warehouses - _TC"},
+				company="_Test Company",
+			)
+		
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
+
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		pr = make_purchase_invoice(item_code="_Test Item with QA",uom = 'Box',cost_center = cost_center[1].name,expense_account="Stock In Hand - _TC",do_not_save = True)
+		pr.save()
+		pr.reload()
+		pr.submit()
 		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_purchase", 1)
 
 		qa = create_quality_inspection(

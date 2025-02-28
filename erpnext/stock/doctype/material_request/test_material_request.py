@@ -2715,7 +2715,26 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(doc_pi.docstatus, 1)
 
 	def test_create_mr_to_po_to_pr_cancel_TC_SCK_055(self):
-		mr = make_material_request()
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+		create_company()
+		create_customer("_Test Customer")
+		make_item("_Test Item", {"is_stock_item": 1})
+		create_supplier(supplier_name="_Test Supplier")
+
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
+		create_warehouse(
+				warehouse_name="_Test Warehouse - _TC",
+				properties={"parent_warehouse": "All Warehouses - _TC", "account": "Cost of Goods Sold - _TC"},
+				company="_Test Company",
+			)
+
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		mr = make_material_request(uom="Unit",cost_center = cost_center[1].name)
 
 		po = make_purchase_order(mr.name)
 		po.supplier = "_Test Supplier"
@@ -4363,7 +4382,26 @@ class TestMaterialRequest(FrappeTestCase):
 			self.assertEqual(gl_stock_debit, 500)
 
 	def test_create_mr_to_2po_to_1pr_part_return_TC_SCK_042(self):
-		mr = make_material_request()
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+		create_company()
+		create_customer("_Test Customer")
+		create_supplier(supplier_name="_Test Supplier")
+		make_item("_Test Item", {"is_stock_item": 1})
+		frappe.db.set_value("Stock Settings","Stock Settings","enable_stock_reservation",1)
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
+		create_warehouse(
+				warehouse_name="_Test Warehouse - _TC",
+				properties={"parent_warehouse": "All Warehouses - _TC"},
+				company="_Test Company",
+			)
+
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		mr = make_material_request(uom = "Unit" ,cost_center = cost_center[1].name)
 		
 		#partially qty
 		po = make_purchase_order(mr.name)
@@ -4420,7 +4458,26 @@ class TestMaterialRequest(FrappeTestCase):
 			self.assertEqual(gl_stock_debit, 1000)
 
 	def test_create_mr_to_2po_to_2pi_partial_return_TC_SCK_106(self):
-		mr = make_material_request()
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+		create_company()
+		create_customer("_Test Customer")
+		make_item("_Test Item", {"is_stock_item": 1})
+		create_supplier(supplier_name="_Test Supplier")
+		frappe.db.set_value("Stock Settings","Stock Settings","enable_stock_reservation",1)
+		create_warehouse(
+				warehouse_name="_Test Warehouse - _TC",
+				properties={"parent_warehouse": "All Warehouses - _TC"},
+				company="_Test Company",
+			)
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
+
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		mr = make_material_request(uom = "Unit",cost_center = cost_center[1].name)
 		
 		#partially qty
 		po = make_purchase_order(mr.name)
@@ -4482,17 +4539,37 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_create_mr_for_purchase_2po_to_1pr_TC_SCK_021(self):
 		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import get_sl_entries, get_gl_entries
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+
+		create_company()
+		create_customer(name = '_Test Customer')
+		create_warehouse(
+			warehouse_name="_Test Warehouse - _TC",
+			properties={"parent_warehouse": "All Warehouses - _TC"},
+			company="_Test Company",
+		)
+		create_item("_Test Item",warehouse="_Test Warehouse - _TC")
+		create_supplier(supplier_name="_Test Supplier")
 
 		frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
 		frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
 		frappe.db.set_value(
 			"Company", "_Test Company", "stock_received_but_not_billed", "Stock Received But Not Billed - _TC"
 		)
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
 		mr = make_material_request(
 			material_request_type="Purchase",
 			qty=10,
 			item_code="_Test Item",
 			rate=100,
+			uom = "Box",
+			cost_center = cost_center[1].name,
 			do_not_submit=True
 		)
 		mr.transaction_date = "01-08-2024"
@@ -4517,9 +4594,9 @@ class TestMaterialRequest(FrappeTestCase):
 		po2.submit()
 
 		pr = make_purchase_receipt(po1.name)
+		
 		pr = make_purchase_receipt(po2.name, target_doc=pr)
 		pr.submit()
-
 		stock_in_hand_account = get_inventory_account("_Test Company", "_Test Warehouse - _TC")
 		
 		# Validate sle
@@ -4803,7 +4880,25 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(doc_po.status, 'Completed')
 
 	def test_create_mr_to_2po_to_1pi_partial_return_TC_SCK_107(self):
-		mr = make_material_request()
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+		create_company()
+		create_item("_Test Item",warehouse="Stores - _TC")
+		create_supplier(supplier_name="_Test Supplier")
+		create_customer("_Test Customer")
+		create_warehouse(
+			warehouse_name="_Test Warehouse - _TC",
+			properties={"parent_warehouse": "All Warehouses - _TC"},
+			company="_Test Company",
+		)
+		if frappe.db.exists("Fiscal Year", "2024-2025"):
+			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
+			fiscal_year.append("companies", {"company": "_Test Company"})
+			fiscal_year.save()
+		else:
+			create_fiscal_with_company("_Test Company")
+		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
+		mr = make_material_request(uom ="Box",cost_center = cost_center[1].name)
+
 		
 		#partially qty
 		po = make_purchase_order(mr.name)
