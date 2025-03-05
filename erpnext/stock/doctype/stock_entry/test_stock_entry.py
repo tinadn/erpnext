@@ -1950,7 +1950,7 @@ class TestStockEntry(FrappeTestCase):
 
 	def test_create_partial_material_request_stock_entry_for_serial_item_TC_SCK_190(self):
 		from erpnext.stock.doctype.material_request.material_request import make_stock_entry as _make_stock_entry
-		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company,make_material_request
+		from erpnext.stock.doctype.material_request.test_material_request import get_or_create_fiscal_year,make_material_request
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
 		company = "_Test Company"
 		create_company()
@@ -1962,12 +1962,7 @@ class TestStockEntry(FrappeTestCase):
 				company="_Test Company",
 			)
 		item = make_item("_Test Item MR", properties={"has_serial_no":1})
-		if frappe.db.exists("Fiscal Year", "2024-2025"):
-			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
-			fiscal_year.append("companies", {"company": "_Test Company"})
-			fiscal_year.save()
-		else:
-			create_fiscal_with_company("_Test Company")
+		get_or_create_fiscal_year('_Test Company')
 
 		item.serial_no_series = f"{item.item_code}.-SL-.####."
 		item.save()
@@ -3633,17 +3628,12 @@ class TestStockEntry(FrappeTestCase):
 	@change_settings("Stock Settings", {"allow_negative_stock": 1})
 	def test_create_mr_se_TC_SCK_063(self):
 		from erpnext.stock.doctype.material_request.material_request import make_stock_entry as _make_stock_entry
-		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company,make_material_request
+		from erpnext.stock.doctype.material_request.test_material_request import get_or_create_fiscal_year,make_material_request
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
 		create_company()
 		create_customer("_Test Customer")
 		item = make_item("_Test Item")
-		if frappe.db.exists("Fiscal Year", "2024-2025"):
-			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
-			fiscal_year.append("companies", {"company": "_Test Company"})
-			fiscal_year.save()
-		else:
-			create_fiscal_with_company("_Test Company")
+		get_or_create_fiscal_year('_Test Company')
 	
 		target_warehouse = create_warehouse(
 				warehouse_name="_Test Warehouse",
@@ -3735,8 +3725,8 @@ class TestStockEntry(FrappeTestCase):
 		self.check_stock_ledger_entries("Stock Entry", se_2.name, [[item_2.name, warehouse_2, 20]])
 
 	def test_stock_manufacture_with_batch_TC_SCK_139(self):
-		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company
-		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
+		from erpnext.stock.doctype.material_request.test_material_request import get_or_create_fiscal_year
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 		create_company()
 		company = "_Test Company"
 		create_warehouse(
@@ -3750,12 +3740,7 @@ class TestStockEntry(FrappeTestCase):
 				properties={"parent_warehouse": "All Warehouses - _TC"},
 				company="_Test Company",
 		)
-		if frappe.db.exists("Fiscal Year", "2024-2025"):
-			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
-			fiscal_year.append("companies", {"company": "_Test Company"})
-			fiscal_year.save()
-		else:
-			create_fiscal_with_company("_Test Company")
+		get_or_create_fiscal_year('_Test Company')
 
 		item = make_item("ADI-SH-W07", {'has_batch_no':1, "create_new_batch":1, "valuation_rate":100})
 		se = make_stock_entry(item_code=item.name,purpose="Manufacture", company=company,target=target_warehouse, qty=150, basic_rate=100,do_not_save=True)
@@ -3771,7 +3756,7 @@ class TestStockEntry(FrappeTestCase):
 
 	def test_inactive_sales_items_TC_SCK_228(self):
 		from erpnext.accounts.report.inactive_sales_items.inactive_sales_items import execute
-		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company
+		from erpnext.stock.doctype.material_request.test_material_request import get_or_create_fiscal_year
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 
 		create_company()
@@ -3787,12 +3772,7 @@ class TestStockEntry(FrappeTestCase):
 				properties={"parent_warehouse": "All Warehouses - _TC", "account": "Cost of Goods Sold - _TC"},
 				company="_Test Company",
 			)
-		if frappe.db.exists("Fiscal Year", "2024-2025"):
-			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
-			fiscal_year.append("companies", {"company": "_Test Company"})
-			fiscal_year.save()
-		else:
-			create_fiscal_with_company("_Test Company")
+		get_or_create_fiscal_year('_Test Company')
 
 		item_c = []
 		q = []

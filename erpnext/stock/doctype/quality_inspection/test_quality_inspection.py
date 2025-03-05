@@ -310,7 +310,7 @@ class TestQualityInspection(FrappeTestCase):
 	def test_qa_for_pi_TC_SCK_160(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 		from erpnext.buying.doctype.supplier.test_supplier import create_supplier
-		from erpnext.stock.doctype.material_request.test_material_request import create_fiscal_with_company
+		from erpnext.stock.doctype.material_request.test_material_request import get_or_create_fiscal_year
 		
 		create_company()
 		create_supplier(supplier_name="_Test Supplier",default_currency = "INR")
@@ -320,12 +320,7 @@ class TestQualityInspection(FrappeTestCase):
 				company="_Test Company",
 			)
 		
-		if frappe.db.exists("Fiscal Year", "2024-2025"):
-			fiscal_year = frappe.get_doc('Fiscal Year', '2024-2025')
-			fiscal_year.append("companies", {"company": "_Test Company"})
-			fiscal_year.save()
-		else:
-			create_fiscal_with_company("_Test Company")
+		get_or_create_fiscal_year('_Test Company')
 
 		cost_center = frappe.db.get_all('Cost Center',{'company':"_Test Company"},"name")
 		pr = make_purchase_invoice(item_code="_Test Item with QA",uom = 'Box',cost_center = cost_center[1].name,expense_account="Stock In Hand - _TC",do_not_save = True)
