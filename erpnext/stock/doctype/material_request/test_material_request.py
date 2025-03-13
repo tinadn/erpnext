@@ -4926,6 +4926,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 		serial_cnt = frappe.db.count('Serial No',{'purchase_document_no':doc_pi.name})
 		self.assertEqual(serial_cnt, 2)
+		frappe.db.rollback()
 
 	def test_mr_po_2pi_serial_TC_SCK_093(self):
 		# MR =>  PO => 2PI
@@ -4992,6 +4993,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 		serial_cnt = frappe.db.count('Serial No',{'purchase_document_no':doc_pi1.name})
 		self.assertEqual(serial_cnt, 1)
+		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_2pi_TC_SCK_094(self):
 		create_company()
@@ -5051,6 +5053,7 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(serial_cnt, 1)
 		serial_cnt = frappe.db.count('Serial No',{'purchase_document_no':pr1.name})
 		self.assertEqual(serial_cnt, 1)
+		frappe.db.rollback()
 
 	def test_create_material_req_to_2po_to_pi_TC_SCK_095(self):
 		qty = 10
@@ -5250,6 +5253,7 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(gl_temp_credit, 100)
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':doc_pi1.name, 'account': credit_account},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_mr_to_2po_to_2pi_serial_cancel_TC_SCK_098(self):
 		create_company()
@@ -5332,6 +5336,7 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(gl_temp_credit, 100)
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pi1.name, 'account': credit_account},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_1pi_serial_cancel_TC_SCK_099(self):
 		create_company()
@@ -5443,6 +5448,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",doc_pi.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 200)
+		frappe.db.rollback()
 
 	def test_mr_po_2pi_serial_return_TC_SCK_109(self):
 		create_company()
@@ -5532,6 +5538,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",doc_pi1.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_mr_to_2po_to_2pi_serial_return_TC_SCK_110(self):
 		create_company()
@@ -5615,6 +5622,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",pi1.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_1pi_serial_return_TC_SCK_111(self):
 		create_company()
@@ -5730,6 +5738,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",doc_pi.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_mr_po_2pi_serial_partial_return_TC_SCK_113(self):
 		create_company()
@@ -5807,6 +5816,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",doc_pi.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_mr_to_2po_to_2pi_sr_partail_return_TC_SCK_114(self):
 		create_company()
@@ -5878,6 +5888,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",pi.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_1pi_sr_prtl_ret_TC_SCK_115(self):
 		create_company()
@@ -5939,6 +5950,7 @@ class TestMaterialRequest(FrappeTestCase):
 		payable_act = frappe.db.get_value("Company",pi.company,"default_payable_account")
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi.name, 'account': payable_act},'debit')
 		self.assertEqual(gl_stock_debit, 100)
+		frappe.db.rollback()
 
 	def test_mr_to_po_pr_with_serial_no_TC_B_156(self):
 		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_company_and_supplier as create_data
@@ -7020,6 +7032,7 @@ class TestMaterialRequest(FrappeTestCase):
 		if frappe.db.exists('GL Entry',{'account': 'Stock In Hand - _TC'}):
 			gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':pr.name, 'account': 'Stock In Hand - _TC'},'debit')
 			self.assertEqual(gl_stock_debit, 500)
+		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_1pr_serl_part_retn_tc_sck_213(self):
 		create_company()
@@ -7107,6 +7120,7 @@ class TestMaterialRequest(FrappeTestCase):
 		
 		gl_stock_debit = frappe.db.get_value('GL Entry',{'voucher_no':return_pi1.name, 'account': 'Stock In Hand - _TC'},'credit')
 		self.assertEqual(gl_stock_debit, 500)
+		frappe.db.rollback()
 
 	def test_make_mr_TC_SCK_185(self):
 			from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
