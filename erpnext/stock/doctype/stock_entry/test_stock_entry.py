@@ -2465,6 +2465,13 @@ class TestStockEntry(FrappeTestCase):
 		se1.submit()
 
 	def test_stock_enrty_with_batch_TC_SCK_076(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2476,7 +2483,7 @@ class TestStockEntry(FrappeTestCase):
 			fields["gst_hsn_code"] = "01011010"
 
 		item = make_item("_Test Batch Item", properties=fields).name
-		se = make_stock_entry(item_code=item, qty=10, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt")
+		se = make_stock_entry(item_code=item, qty=10, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt", expense_account="Stock Adjustment - _TC")
 
 		batch = frappe.get_all('Batch',filters={'item': item,"reference_name":se.name},fields=['name',"batch_qty",'item',"reference_name"])
 		
@@ -2486,6 +2493,13 @@ class TestStockEntry(FrappeTestCase):
 		self.assertEqual(batch[0]['reference_name'], se.name)
 
 	def test_stock_enrty_with_serial_and_batch_TC_SCK_077(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2499,7 +2513,7 @@ class TestStockEntry(FrappeTestCase):
 			fields["gst_hsn_code"] = "01011010"
 
 		item = make_item("_Test Batch Item", properties=fields).name
-		se = make_stock_entry(item_code=item, qty=5, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt")
+		se = make_stock_entry(item_code=item, qty=5, rate=100, target="_Test Warehouse - _TC",purpose="Material Receipt", expense_account="Stock Adjustment - _TC")
 
 		batch = frappe.get_all('Batch',filters={'item': item,"reference_name":se.name},fields=['name',"batch_qty",'item',"reference_name"])
 
@@ -2518,6 +2532,13 @@ class TestStockEntry(FrappeTestCase):
 			self.assertEqual(serial['batch_no'], batch[0]['name'])
 
 	def test_stock_entry_for_multiple_items_with_serial_batch_no_TC_SCK_078(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no": 1,
@@ -2535,14 +2556,15 @@ class TestStockEntry(FrappeTestCase):
 
 		se = make_stock_entry(
 			item_code=item_1, qty=5, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		se.append("items", {
 			"item_code": item_2,
 			"qty": 5,
 			"basic_rate": 150,
-			"t_warehouse": "_Test Warehouse - _TC"
+			"t_warehouse": "_Test Warehouse - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		se.save()
@@ -2573,6 +2595,13 @@ class TestStockEntry(FrappeTestCase):
 				self.assertEqual(serial['batch_no'], batch[0]['name'])
 
 	def test_stock_entry_for_multiple_items_with_batch_no_TC_SCK_079(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no": 1,
@@ -2588,14 +2617,15 @@ class TestStockEntry(FrappeTestCase):
 
 		se = make_stock_entry(
 			item_code=item_1, qty=5, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		se.append("items", {
 			"item_code": item_2,
 			"qty": 5,
 			"basic_rate": 150,
-			"t_warehouse": "_Test Warehouse - _TC"
+			"t_warehouse": "_Test Warehouse - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		se.save()
@@ -2726,6 +2756,13 @@ class TestStockEntry(FrappeTestCase):
 
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":1,"pick_serial_and_batch_based_on":"FIFO"})
 	def test_material_transfer_with_disable_selector_TC_SCK_091(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2744,14 +2781,15 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semr.append("items", {
 			"item_code": item_2,
 			"qty": 15,
 			"basic_rate": 150,
-			"t_warehouse": "_Test Warehouse - _TC"
+			"t_warehouse": "_Test Warehouse - _TC",
+			"expense_account": "Stock Adjustment - _TC",
 		})
 
 		semr.save()
@@ -2759,7 +2797,7 @@ class TestStockEntry(FrappeTestCase):
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Transfer", do_not_save=True
+			purpose="Material Transfer", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semt.append("items", {
@@ -2767,7 +2805,8 @@ class TestStockEntry(FrappeTestCase):
 			"qty": 10,
 			"basic_rate": 150,
 			"t_warehouse": "Stores - _TC",
-			"s_warehouse": "_Test Warehouse - _TC"
+			"s_warehouse": "_Test Warehouse - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semt.save()
@@ -2784,6 +2823,13 @@ class TestStockEntry(FrappeTestCase):
 	
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":0,"pick_serial_and_batch_based_on":"FIFO"})
 	def test_mt_with_disable_serial_batch_no_outward_TC_SCK_116(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2801,14 +2847,14 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 		semr.save()
 		semr.submit()
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Transfer", do_not_save=True
+			purpose="Material Transfer", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 		semt.save()
 		semt.submit()
@@ -2823,6 +2869,13 @@ class TestStockEntry(FrappeTestCase):
 
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":0,"pick_serial_and_batch_based_on":"FIFO"})
 	def test_mt_with_multiple_items_disable_serial_batch_no_outward_TC_SCK_117(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2841,14 +2894,15 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semr.append("items", {
 			"item_code": item_2,
 			"qty": 15,
 			"basic_rate": 150,
-			"t_warehouse": "_Test Warehouse - _TC"
+			"t_warehouse": "_Test Warehouse - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semr.save()
@@ -2856,7 +2910,7 @@ class TestStockEntry(FrappeTestCase):
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Transfer", do_not_save=True
+			purpose="Material Transfer", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semt.append("items", {
@@ -2864,7 +2918,8 @@ class TestStockEntry(FrappeTestCase):
 			"qty": 10,
 			"basic_rate": 150,
 			"t_warehouse": "Stores - _TC",
-			"s_warehouse": "_Test Warehouse - _TC"
+			"s_warehouse": "_Test Warehouse - _TC",
+			"expense_account":"Stock Adjustment - _TC"
 		})
 
 		semt.save()
@@ -2881,7 +2936,18 @@ class TestStockEntry(FrappeTestCase):
 
 	@change_settings("Stock Settings", {"default_warehouse": "_Test Warehouse - _TC"})
 	def test_item_creation_TC_SCK_118(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		item_1 = create_item(item_code="_Test Item New", is_stock_item=1, opening_stock=15,valuation_rate=100)
+		for itm in item_1.item_defaults:
+			itm.expense_account = "Stock Adjustment - _TC"
+		item_1.save()
+		
 		stock = frappe.get_all("Stock Ledger Entry", filters={"item_code": item_1.name}, 
 							 fields=["warehouse", "actual_qty"])
 		
@@ -2890,6 +2956,13 @@ class TestStockEntry(FrappeTestCase):
 
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":0,"pick_serial_and_batch_based_on":"FIFO"})
 	def test_mt_with_different_warehouse_disable_serial_batch_no_outward_TC_SCK_119(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2908,14 +2981,15 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semr.append("items", {
 			"item_code": item_2,
 			"qty": 15,
 			"basic_rate": 150,
-			"t_warehouse": "Stores - _TC"
+			"t_warehouse": "Stores - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semr.save()
@@ -2923,7 +2997,7 @@ class TestStockEntry(FrappeTestCase):
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Transfer", do_not_save=True
+			purpose="Material Transfer", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semt.append("items", {
@@ -2931,7 +3005,8 @@ class TestStockEntry(FrappeTestCase):
 			"qty": 10,
 			"basic_rate": 150,
 			"t_warehouse": "_Test Warehouse - _TC",
-			"s_warehouse": "Stores - _TC"
+			"s_warehouse": "Stores - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semt.save()
@@ -2948,6 +3023,13 @@ class TestStockEntry(FrappeTestCase):
 	
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":0})
 	def test_mi_with_disable_batch_selector_TC_SCK_120(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -2965,12 +3047,12 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt"
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC"
 		)
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Issue"
+			purpose="Material Issue", expense_account="Stock Adjustment - _TC"
 		)
 
 		sle = frappe.get_all("Stock Ledger Entry", filters={"voucher_no": semt.name}, fields=["actual_qty", "item_code"])
@@ -2982,6 +3064,13 @@ class TestStockEntry(FrappeTestCase):
 
 	@change_settings("Stock Settings", {"use_serial_batch_fields": 0,"disable_serial_no_and_batch_selector":0,"auto_create_serial_and_batch_bundle_for_outward":0,"pick_serial_and_batch_based_on":"FIFO"})
 	def test_mi_with_multiple_item_disable_batch_selector_TC_SCK_121(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+		create_account(
+			account_name= "Stock Adjustment",
+			parent_account="Stock Expenses - _TC",
+			company="_Test Company",
+		)
+
 		fields = {
 			"is_stock_item": 1, 
 			"has_batch_no":1,
@@ -3000,14 +3089,15 @@ class TestStockEntry(FrappeTestCase):
 
 		semr = make_stock_entry(
 			item_code=item_1, qty=15, rate=100, target="_Test Warehouse - _TC",
-			purpose="Material Receipt", do_not_save=True
+			purpose="Material Receipt", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semr.append("items", {
 			"item_code": item_2,
 			"qty": 15,
 			"basic_rate": 150,
-			"t_warehouse": "Stores - _TC"
+			"t_warehouse": "Stores - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semr.save()
@@ -3015,7 +3105,7 @@ class TestStockEntry(FrappeTestCase):
 
 		semt = make_stock_entry(
 			item_code=item_1, qty=10, rate=100, source="_Test Warehouse - _TC", target = "Stores - _TC",
-			purpose="Material Issue", do_not_save=True
+			purpose="Material Issue", expense_account="Stock Adjustment - _TC", do_not_save=True
 		)
 
 		semt.append("items", {
@@ -3023,7 +3113,8 @@ class TestStockEntry(FrappeTestCase):
 			"qty": 10,
 			"basic_rate": 150,
 			"t_warehouse": "_Test Warehouse - _TC",
-			"s_warehouse": "Stores - _TC"
+			"s_warehouse": "Stores - _TC",
+			"expense_account": "Stock Adjustment - _TC"
 		})
 
 		semt.save()

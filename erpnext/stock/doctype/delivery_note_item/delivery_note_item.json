@@ -749,6 +749,7 @@
    "fieldtype": "Currency",
    "label": "Incoming Rate",
    "no_copy": 1,
+   "options": "Company:company:default_currency",
    "precision": "6",
    "print_hide": 1,
    "read_only": 1

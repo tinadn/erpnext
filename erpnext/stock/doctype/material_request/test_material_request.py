@@ -3001,35 +3001,42 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_create_mr_issue_to_stock_entry_with_batch_and_TC_SCK_062(self):
 		from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry as _make_stock_entry
+		company = "_Test Company with perpetual inventory"
 
 		fields = {
 			"has_batch_no": 1,
 			"is_stock_item": 1,
+   			"has_serial_no": 1,
 			"create_new_batch": 1,
 			"batch_naming_series": "Test-SBBTYT-NNS.#####",
+			"serial_no_series": "Test-SABBMRP-Sno.#####",
+			"company": company
 		}
 
 		if frappe.db.has_column("Item", "gst_hsn_code"):
 			fields["gst_hsn_code"] = "01011010"
 
-		company = "_Test Company"
 		qty = 10
-		frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
-		frappe.db.set_value("Company", "_Test Company", "stock_adjustment_account", "Stock Adjustment - _TC")
-		target_warehouse = create_warehouse("_Test Warehouse", properties=None, company=company)
-		item = make_item("Test Use Serial and Batch Item SN Item", fields).name
-
+		# frappe.db.set_value("Company", "_Test Company", "enable_perpetual_inventory", 1)
+		frappe.db.set_value("Company", company, "stock_adjustment_account", "Stock Adjustment - TCP1")
+		target_warehouse = create_warehouse("Finished Goods - TCP1", properties=None, company=company)
+		item = make_item("Test Use Serial and Batch Item SN Items", fields).name
 		new_stock = _make_stock_entry(
 			item_code=item,
 			qty=10,
 			to_warehouse=target_warehouse,
-			company="_Test Company",
+			company=company,
 			rate=100,
 		)
 		self.assertTrue(new_stock.items[0].serial_and_batch_bundle)
 
 		mr = make_material_request(
-			material_request_type="Material Issue", qty=qty, warehouse=target_warehouse, item_code=item
+			material_request_type="Material Issue",
+   			qty=qty, 
+      		warehouse=target_warehouse,
+        	item_code=item,
+         	company=company,
+          	cost_center="Main - TCP1"
 		)
 		self.assertEqual(mr.status, "Pending")
 
@@ -3040,7 +3047,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 		# Make stock entry against material request issue
 		se = make_stock_entry(mr.name)
-		se.items[0].expense_account = "Cost of Goods Sold - _TC"
+		se.items[0].expense_account = "Cost of Goods Sold - TCP1"
 		se.serial_and_batch_bundle = new_stock.items[0].serial_and_batch_bundle
 		se.insert()
 		se.submit()
@@ -3056,19 +3063,20 @@ class TestMaterialRequest(FrappeTestCase):
 			)
 		)
 		gle = get_gle(company, se.name, stock_in_hand_account)
-		gle1 = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+
+		gle1 = get_gle(company, se.name, "Cost of Goods Sold - TCP1")
 		self.assertEqual(sle.qty_after_transaction, bin_qty - qty)
 		self.assertEqual(gle[1], stock_value_diff)
 		self.assertEqual(gle1[0], stock_value_diff)
 		se.cancel()
 		mr.load_from_db()
-
+  
 		# After stock entry cancel
 		current_bin_qty = (
 			frappe.db.get_value("Bin", {"item_code": item, "warehouse": target_warehouse}, "actual_qty") or 0
 		)
 		sh_gle = get_gle(company, se.name, stock_in_hand_account)
-		cogs_gle = get_gle(company, se.name, "Cost of Goods Sold - _TC")
+		cogs_gle = get_gle(company, se.name, "_Test Company with perpetual inventory - TCP1")
 
 		self.assertEqual(sh_gle[0], sh_gle[1])
 		self.assertEqual(cogs_gle[0], cogs_gle[1])
@@ -3567,32 +3575,6 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(mr.status, "Pending")
 
 	def test_create_mr_for_purchase_to_po_TC_SCK_019(self):
-		self.create_mr_for_puchase_to_po_to_invoice()
-	
-	def test_create_mr_for_purchase_to_po_cancel_pr_TC_SCK_066(self):
-		pr = self.create_mr_for_puchase_to_po_to_invoice()
-		pr.cancel()
-
-		sl_entry_cancelled = frappe.db.get_all(
-			"Stock Ledger Entry",
-			{"voucher_type": "Purchase Receipt", "voucher_no": pr.name},
-			["actual_qty", "warehouse", "serial_and_batch_bundle"],
-			order_by="creation",
-		)
-
-		warehouse_qty = {
-			"_Test Warehouse - _TC": 0
-		}
-
-		for sle in sl_entry_cancelled:
-			warehouse_qty[sle.get('warehouse')] += sle.get('actual_qty')
-		
-		self.assertEqual(warehouse_qty["_Test Warehouse - _TC"], 0)
-	
-	def create_mr_for_puchase_to_po_to_invoice(self):
-		from erpnext.stock.doctype.stock_entry.test_stock_entry import TestStockEntry as tse
-
-		# Create Material Request for Purchase
 		fields = {
 			"has_batch_no": 1,
 			"has_serial_no": 1,
@@ -3609,7 +3591,7 @@ class TestMaterialRequest(FrappeTestCase):
 			material_request_type="Purchase",
 			qty=2,
 			item_code=item,
-			rate=10000
+			rate=10000,
 		)
 
 		po = make_purchase_order(mr.name)
@@ -3643,20 +3625,51 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(sabb.entries[0].serial_no, "Test-SABBMRP-Sno-001")
 		self.assertEqual(sabb.entries[1].serial_no, "Test-SABBMRP-Sno-002")
 		self.assertEqual(sabb.entries[0].batch_no, "Test-SABBMRP-Bno-001")
+	
+	def test_create_mr_for_purchase_to_po_cancel_pr_TC_SCK_066(self):
+		# Create Material Request for Purchase
+		fields = {
+			"has_batch_no": 1,
+			"has_serial_no": 1,
+			"is_stock_item": 1,
+			"create_new_batch": 1,
+			"batch_naming_series": "Test-SABBMRP-Bno.#####",
+		}
 
-		return pr
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
 
-	def test_create_mr_for_purchase_to_po_2pr_TC_SCK_020(self):
-		self.create_mr_for_purchase_to_po_2pr()
+		item = make_item("Test Use Serial and Batch Item SN Item", fields).name
+		mr = make_material_request(
+			material_request_type="Purchase",
+			qty=2,
+			item_code=item,
+			rate=10000
+		)
 
-	def test_create_mr_for_purchase_to_po__cancel_2pr_TC_SCK_067(self):
-		pr1, pr2 = self.create_mr_for_purchase_to_po_2pr()
-		pr1.cancel()
-		pr2.cancel()
+		po = make_purchase_order(mr.name)
+		po.supplier = "_Test Supplier"
+		po.save()
+		po.submit()
+
+		pr = make_purchase_receipt(po.name)
+		pr.items[0].use_serial_batch_fields = 1
+		pr.items[0].serial_no = "Test-SABBMRP-Sno-003\nTest-SABBMRP-Sno-004"
+
+		if not frappe.db.exists({"doctype": "Batch", "batch_id":"Test-SABBMRP-Bno-001"}):
+			b_no = frappe.new_doc("Batch")
+			b_no.batch_id = "Test-SABBMRP-Bno-001"
+			b_no.item = item
+			b_no.save()
+
+		pr.items[0].batch_no = "Test-SABBMRP-Bno-001"
+		pr.save()
+		pr.submit()
+		pr.cancel()
 
 		sl_entry_cancelled = frappe.db.get_all(
 			"Stock Ledger Entry",
-			{"voucher_type": "Purchase Receipt", "voucher_no": ["in",[pr1.name, pr2.name]]},
+			{"voucher_type": "Purchase Receipt", "voucher_no": pr.name},
 			["actual_qty", "warehouse", "serial_and_batch_bundle"],
 			order_by="creation",
 		)
@@ -3669,8 +3682,8 @@ class TestMaterialRequest(FrappeTestCase):
 			warehouse_qty[sle.get('warehouse')] += sle.get('actual_qty')
 		
 		self.assertEqual(warehouse_qty["_Test Warehouse - _TC"], 0)
-		
-	def create_mr_for_purchase_to_po_2pr(self):
+
+	def test_create_mr_for_purchase_to_po_2pr_TC_SCK_020(self):
 		fields = {
 			"has_batch_no": 1,
 			"has_serial_no": 1,
@@ -3707,7 +3720,7 @@ class TestMaterialRequest(FrappeTestCase):
 		pr1.posting_date = "05-08-2024"
 		pr1.items[0].use_serial_batch_fields = 1
 		pr1.items[0].qty = 3
-		pr1.items[0].serial_no = "Test-SABBMRP-Sno-001\nTest-SABBMRP-Sno-002\nTest-SABBMRP-Sno-003"
+		pr1.items[0].serial_no = "Test-SABBMRP-Sno-005\nTest-SABBMRP-Sno-006\nTest-SABBMRP-Sno-007"
 
 		if not frappe.db.exists({"doctype": "Batch", "batch_id":"Test-SABBMRP-Bno-001"}):
 			b_no = frappe.new_doc("Batch")
@@ -3728,14 +3741,14 @@ class TestMaterialRequest(FrappeTestCase):
 
 		sabb = frappe.get_doc("Serial and Batch Bundle", sl_entry[0].serial_and_batch_bundle)
 		self.assertEqual(sl_entry[0].actual_qty, 3)
-		self.assertEqual(sabb.entries[0].serial_no, "Test-SABBMRP-Sno-001")
+		self.assertEqual(sabb.entries[0].serial_no, "Test-SABBMRP-Sno-005")
 		self.assertEqual(sabb.entries[0].batch_no, "Test-SABBMRP-Bno-001")
 
 		pr2 = make_purchase_receipt(po.name)
 		pr2.posting_date = "10-08-2024"
 		pr2.items[0].use_serial_batch_fields = 1
 		pr2.items[0].qty = 2
-		pr2.items[0].serial_no = "Test-SABBMRP-Sno-004\nTest-SABBMRP-Sno-005"
+		pr2.items[0].serial_no = "Test-SABBMRP-Sno-008\nTest-SABBMRP-Sno-009"
 
 		if not frappe.db.exists({"doctype": "Batch", "batch_id":"Test-SABBMRP-Bno-001"}):
 			b_no = frappe.new_doc("Batch")
@@ -3756,11 +3769,104 @@ class TestMaterialRequest(FrappeTestCase):
 
 		sabb = frappe.get_doc("Serial and Batch Bundle", sl_entry[0].serial_and_batch_bundle)
 		self.assertEqual(sl_entry[0].actual_qty, 2)
-		self.assertEqual(sabb.entries[1].serial_no, "Test-SABBMRP-Sno-005")
+		self.assertEqual(sabb.entries[1].serial_no, "Test-SABBMRP-Sno-009")
 		self.assertEqual(sabb.entries[1].batch_no, "Test-SABBMRP-Bno-001")
 
-		return pr1, pr2
+	def test_create_mr_for_purchase_to_po__cancel_2pr_TC_SCK_067(self):
+		fields = {
+			"has_batch_no": 1,
+			"has_serial_no": 1,
+			"is_stock_item": 1,
+			"create_new_batch": 1,
+			"batch_naming_series": "Test-SABBMRP-Bno.#####",
+		}
+
+		if frappe.db.has_column("Item", "gst_hsn_code"):
+			fields["gst_hsn_code"] = "01011010"
+
+		item = make_item("Test Use Serial and Batch Item SN Item", fields).name
+
+		# Create Material Request for Purchase
+		mr = make_material_request(
+			material_request_type="Purchase",
+			qty=5,
+			item_code=item,
+			rate=10000,
+			do_not_submit=True
+		)
+		mr.transaction_date = "01-08-2024"
+		mr.schedule_date = "15-08-2024"
+		mr.save()
+		mr.submit()
+
+		po = make_purchase_order(mr.name)
+		po.posting_date = "05-08-2024"
+		po.supplier = "_Test Supplier"
+		po.save()
+		po.submit()
+
+		pr1 = make_purchase_receipt(po.name)
+		pr1.posting_date = "05-08-2024"
+		pr1.items[0].use_serial_batch_fields = 1
+		pr1.items[0].qty = 3
+		pr1.items[0].serial_no = "Test-SABBMRP-Sno-010\nTest-SABBMRP-Sno-011\nTest-SABBMRP-Sno-012"
+
+		if not frappe.db.exists({"doctype": "Batch", "batch_id":"Test-SABBMRP-Bno-001"}):
+			b_no = frappe.new_doc("Batch")
+			b_no.batch_id = "Test-SABBMRP-Bno-001"
+			b_no.item = item
+			b_no.save()
+
+		pr1.items[0].batch_no = "Test-SABBMRP-Bno-001"
+		pr1.save()
+		pr1.submit()
+
+		sl_entry = frappe.db.get_all(
+			"Stock Ledger Entry",
+			{"voucher_type": "Purchase Receipt", "voucher_no": pr1.name},
+			["actual_qty", "serial_and_batch_bundle"],
+			order_by="creation",
+		)
+
+		sabb = frappe.get_doc("Serial and Batch Bundle", sl_entry[0].serial_and_batch_bundle)
+		self.assertEqual(sl_entry[0].actual_qty, 3)
+		self.assertEqual(sabb.entries[0].serial_no, "Test-SABBMRP-Sno-010")
+		self.assertEqual(sabb.entries[0].batch_no, "Test-SABBMRP-Bno-001")
+
+		pr2 = make_purchase_receipt(po.name)
+		pr2.posting_date = "10-08-2024"
+		pr2.items[0].use_serial_batch_fields = 1
+		pr2.items[0].qty = 2
+		pr2.items[0].serial_no = "Test-SABBMRP-Sno-013\nTest-SABBMRP-Sno-014"
+
+		if not frappe.db.exists({"doctype": "Batch", "batch_id":"Test-SABBMRP-Bno-001"}):
+			b_no = frappe.new_doc("Batch")
+			b_no.batch_id = "Test-SABBMRP-Bno-001"
+			b_no.item = item
+			b_no.save()
+
+		pr2.items[0].batch_no = "Test-SABBMRP-Bno-001"
+		pr2.save()
+		pr2.submit()
+  
+		pr1.cancel()
+		pr2.cancel()
+
+		sl_entry_cancelled = frappe.db.get_all(
+			"Stock Ledger Entry",
+			{"voucher_type": "Purchase Receipt", "voucher_no": ["in",[pr1.name, pr2.name]]},
+			["actual_qty", "warehouse", "serial_and_batch_bundle"],
+			order_by="creation",
+		)
+
+		warehouse_qty = {
+			"_Test Warehouse - _TC": 0
+		}
+
+		for sle in sl_entry_cancelled:
+			warehouse_qty[sle.get('warehouse')] += sle.get('actual_qty')
 		
+		self.assertEqual(warehouse_qty["_Test Warehouse - _TC"], 0)
 
 	def test_create_material_req_to_2po_to_1pi_cancel_TC_SCK_089(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company

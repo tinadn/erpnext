@@ -711,7 +711,7 @@ class StockEntry(StockController):
 				)
 	def get_matched_items(self, item_code):
 		for row in self.items:
-			if row.item_code == item_code:
+			if row.item_code == item_code or row.original_item == item_code:
 				return row
 		return {}
 
@@ -1752,7 +1752,7 @@ class StockEntry(StockController):
 				if self.work_order and self.purpose == "Material Transfer for Manufacture":
 					item_dict = self.get_pending_raw_materials(backflush_based_on)
 					if self.to_warehouse and self.pro_doc:
-						for item in item_dict.values():
+						for original_item, item in item_dict.items():
 							item["to_warehouse"] = self.pro_doc.wip_warehouse
 					self.add_to_stock_entry_detail(item_dict)
 
@@ -1815,6 +1815,8 @@ class StockEntry(StockController):
 						item["to_warehouse"] = (
 							self.to_warehouse if self.purpose == "Send to Subcontractor" else ""
 						)
+						if original_item != item.get("item_code"):
+							item["original_item"] = original_item
 
 					self.add_to_stock_entry_detail(item_dict)
 
