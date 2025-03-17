@@ -280,8 +280,10 @@ class TestQualityInspection(FrappeTestCase):
 		se.delete()
 
 	def test_qa_for_pr_TC_SCK_159(self):
+		create_company()
 		item_code = create_item("_Test Item with QA", valuation_rate=200).name
-		pr = make_purchase_receipt(item_code = item_code)
+		pr = make_purchase_receipt(item_code = item_code, company = "_Test Company QA",do_not_submit=True)
+
 		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_purchase", 1)
 
 		qa = create_quality_inspection(
@@ -292,6 +294,8 @@ class TestQualityInspection(FrappeTestCase):
 		self.assertEqual(qa.docstatus, 0)
 		qa.submit()
 		qa.reload()
+		pr.reload()
+		pr.submit()
 		self.assertEqual(qa.status, "Accepted")
 
 		qa.reload()
@@ -358,10 +362,12 @@ class TestQualityInspection(FrappeTestCase):
 		si.cancel()
 
 	def test_qa_for_pr_out_TC_SCK_162(self):
+		create_company()
 		item_code = create_item("_Test Item with QA", valuation_rate=200).name
-		pr = make_purchase_receipt(item_code = item_code)
-		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_purchase", 1)
 
+		pr = make_purchase_receipt(item_code = item_code, company = "_Test Company QA",do_not_submit=True)
+
+		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_purchase", 1)
 		qa = create_quality_inspection(
 			reference_type="Purchase Receipt", reference_name=pr.name, status="Accepted", inspection_type="Outgoing", do_not_submit=True
 		)
@@ -369,9 +375,11 @@ class TestQualityInspection(FrappeTestCase):
 		qa.reload()
 		self.assertEqual(qa.docstatus, 0)
 		qa.submit()
+		pr.reload()
+		pr.submit()
 		qa.reload()
 		self.assertEqual(qa.status, "Accepted")
-
+		
 		qa.reload()
 		qa.cancel()
 		pr.reload()
@@ -431,7 +439,7 @@ class TestQualityInspection(FrappeTestCase):
 
 	def test_qa_for_pr_proc_TC_SCK_166(self):
 		item_code = create_item("_Test Item with QA", valuation_rate=200).name
-		pr = make_purchase_receipt(item_code = item_code)
+		pr = make_purchase_receipt(item_code = item_code, do_not_submit=True)
 		frappe.db.set_value("Item", "_Test Item with QA", "inspection_required_before_purchase", 1)
 
 		qa = create_quality_inspection(
@@ -442,6 +450,8 @@ class TestQualityInspection(FrappeTestCase):
 		self.assertEqual(qa.docstatus, 0)
 		qa.submit()
 		qa.reload()
+		pr.reload()
+		pr.submit()
 		self.assertEqual(qa.status, "Accepted")
 
 		qa.reload()

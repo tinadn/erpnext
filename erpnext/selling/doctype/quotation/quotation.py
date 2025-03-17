@@ -532,7 +532,7 @@ def _make_customer(source_name, ignore_permissions=False):
 
 
 def create_customer_from_lead(lead_name, ignore_permissions=False):
-	from crm.crm.doctype.lead.lead import _make_customer
+	from custom_crm.crm.doctype.lead.lead import _make_customer
 
 	customer = _make_customer(lead_name, ignore_permissions=ignore_permissions)
 	customer.flags.ignore_permissions = ignore_permissions
@@ -545,7 +545,7 @@ def create_customer_from_lead(lead_name, ignore_permissions=False):
 
 
 def create_customer_from_prospect(prospect_name, ignore_permissions=False):
-	from crm.crm.doctype.prospect.prospect import make_customer as make_customer_from_prospect
+	from custom_crm.crm.doctype.prospect.prospect import make_customer as make_customer_from_prospect
 
 	customer = make_customer_from_prospect(prospect_name)
 	customer.flags.ignore_permissions = ignore_permissions

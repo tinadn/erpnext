@@ -983,7 +983,9 @@ class JobCard(Document):
 			if self.time_logs:
 				self.status = "Work In Progress"
 
-			if self.docstatus == 1 and (self.for_quantity <= self.total_completed_qty or not self.items):
+			if self.docstatus == 1 and (
+				self.for_quantity <= (self.total_completed_qty + self.process_loss_qty) or not self.items
+			):
 				self.status = "Completed"
 
 		if update_status:

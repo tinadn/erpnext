@@ -357,7 +357,10 @@ def make_blanket_order(**args):
 		},
 	)
 
+	# bypass permission checks to allow creation
+	bo.flags.ignore_permissions = True 
 	bo.insert()
+	bo.flags.ignore_permissions = True 
 	bo.submit()
 	return bo
 

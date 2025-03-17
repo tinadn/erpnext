@@ -231,8 +231,8 @@ class TestSerialNo(FrappeTestCase):
 		).name
 		warehouse = "_Test Warehouse - _TC"
 
-		in1 = make_stock_entry(item_code=item_code, to_warehouse=warehouse, qty=5)
-		in2 = make_stock_entry(item_code=item_code, to_warehouse=warehouse, qty=5)
+		in1 = make_stock_entry(item_code=item_code, to_warehouse=warehouse, qty=5, rate=500)
+		in2 = make_stock_entry(item_code=item_code, to_warehouse=warehouse, qty=5, rate=500)
 
 		in1.reload()
 		in2.reload()

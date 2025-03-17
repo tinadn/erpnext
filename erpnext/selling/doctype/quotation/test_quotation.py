@@ -1051,6 +1051,7 @@ class TestQuotation(FrappeTestCase):
 		quotation.reload()
 		self.assertEqual(quotation.status, "Ordered")
 		mr = make_material_request(sales_order.name)
+		mr.schedule_date = nowdate()
 		mr.save()
 		mr.submit()
 		mr.reload()

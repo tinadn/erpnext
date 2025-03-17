@@ -4683,6 +4683,13 @@ class TestSalesInvoice(FrappeTestCase):
 				posting_date=pe.posting_date	
 			)
 	def test_sales_invoice_without_sales_order_with_gst_TC_S_016(self):
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+
+		create_registered_company()
+		
+		if not frappe.db.exists("Warehouse", "Stores - _TIRC"):
+			create_warehouse("Stores - _TIRC", company="_Test Indian Registered Company")
+
 		setting = frappe.get_doc("Selling Settings")
 		setting.so_required = 'No'
 		setting.save()
@@ -4751,6 +4758,13 @@ class TestSalesInvoice(FrappeTestCase):
 				self.assertEqual(dn_acc_debit, qty_change[0].get("valuation_rate") * 4)
 	
 	def test_sales_invoice_with_update_stock_checked_with_gst_TC_S_017(self): 
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+
+		create_registered_company()
+
+		if not frappe.db.exists("Warehouse", "Stores - _TIRC"):
+			create_warehouse("Stores - _TIRC", company="_Test Indian Registered Company")
+
 		company = frappe.get_all("Company", {"name": "_Test Indian Registered Company"}, ["gstin", "gst_category"])
 		customer = frappe.get_all("Customer", {"name": "_Test Registered Customer"}, ["gstin", "gst_category"])
 		company_add = frappe.get_all("Address", {"name": "_Test Indian Registered Company-Billing"}, ["name", "gstin", "gst_category"])
@@ -4965,8 +4979,11 @@ class TestSalesInvoice(FrappeTestCase):
 		gl_entries_dn = frappe.get_all("GL Entry", filters={"voucher_no": dn_return.name}, fields=["account", "debit", "credit"])
 		gl_debits_dn = {entry.account: entry.debit for entry in gl_entries_dn}
 		gl_credits_dn = {entry.account: entry.credit for entry in gl_entries_dn}
-		self.assertAlmostEqual(gl_credits_dn['Cost of Goods Sold - _TC'], 5000)
-		self.assertAlmostEqual(gl_debits_dn['Stock In Hand - _TC'], 5000)
+		inventory_account = frappe.db.get_value("Company", "_Test Company", "default_inventory_account")
+		expense_account = frappe.db.get_value("Company", "_Test Company", "default_expense_account")
+
+		self.assertAlmostEqual(gl_credits_dn[expense_account], 5000)
+		self.assertAlmostEqual(gl_debits_dn[inventory_account], 5000)
 
 
 		sle_dn_return = frappe.get_all(
@@ -5029,6 +5046,8 @@ class TestSalesInvoice(FrappeTestCase):
 		gl_credits_si = {entry.account: entry.credit for entry in gl_entries_si}
 		debtor_account = frappe.db.get_value("Company", "_Test Company", "default_receivable_account")
 		sales_account = frappe.db.get_value("Company", "_Test Company", "default_income_account")
+		inventory_account = frappe.db.get_value("Company", "_Test Company", "default_inventory_account")
+		expense_account = frappe.db.get_value("Company", "_Test Company", "default_expense_account")
 		
 		self.assertAlmostEqual(gl_debits_si[debtor_account], 15000)
 		self.assertAlmostEqual(gl_credits_si[sales_account], 15000)
@@ -5049,8 +5068,8 @@ class TestSalesInvoice(FrappeTestCase):
 		gl_entries_dn = frappe.get_all("GL Entry", filters={"voucher_no": dn_return.name}, fields=["account", "debit", "credit"])
 		gl_debits_dn = {entry.account: entry.debit for entry in gl_entries_dn}
 		gl_credits_dn = {entry.account: entry.credit for entry in gl_entries_dn}
-		self.assertAlmostEqual(gl_credits_dn['Cost of Goods Sold - _TC'], 5000)
-		self.assertAlmostEqual(gl_debits_dn['Stock In Hand - _TC'], 5000)
+		self.assertAlmostEqual(gl_credits_dn[expense_account], 5000)
+		self.assertAlmostEqual(gl_debits_dn[inventory_account], 5000)
 
 		crn = create_sales_invoice(
 			item="_Test Item Home Desktop 100",
@@ -5066,8 +5085,8 @@ class TestSalesInvoice(FrappeTestCase):
 		gl_debits_crn = {entry.account: entry.debit for entry in gl_entries_crn}
 		gl_credits_crn = {entry.account: entry.credit for entry in gl_entries_crn}
 		
-		self.assertAlmostEqual(gl_debits_crn['Sales - _TC'], 6000)
-		self.assertAlmostEqual(gl_credits_crn['Debtors - _TC'], 6000)
+		self.assertAlmostEqual(gl_debits_crn[sales_account], 6000)
+		self.assertAlmostEqual(gl_credits_crn[debtor_account], 6000)
 
 		stock_entries_crn = frappe.get_all(
 			"Stock Ledger Entry",
@@ -7186,7 +7205,8 @@ def create_company_and_supplier():
 				]
 			}
 		).insert()
-	
+
+	frappe.db.commit()
 
 	return {
 		"parent_company": parent_company,
@@ -7215,3 +7235,15 @@ def get_active_fiscal_year():
 		}).insert(ignore_permissions=True).name
 
 	return get_fiscal_year
+
+def create_registered_company():
+	frappe.set_user("Administrator")
+	if not frappe.db.exists("Company", "_Test Indian Registered Company"):
+		frappe.get_doc({
+			"doctype": "Company",
+			"company_name": "_Test Indian Registered Company",
+			"company_type": "Company",
+			"default_currency": "INR",
+			"company_email": "test@example.com",
+			"abbr":"_TIRC"
+		}).insert(ignore_permissions=True)

@@ -25,7 +25,7 @@ erpnext.utils.CRMActivities = class CRMActivities {
 
 		// open activities
 		// frappe.call({
-		// 	method: "crm.crm.utils.get_open_activities",
+		// 	method: "custom_crm.crm.utils.get_open_activities",
 		// 	args: {
 		// 		ref_doctype: this.frm.doc.doctype,
 		// 		ref_docname: this.frm.doc.name,

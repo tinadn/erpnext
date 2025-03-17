@@ -242,8 +242,7 @@ class RepostItemValuation(Document):
 			WHERE item_code = %(item_code)s
 				AND warehouse = %(warehouse)s
 				AND name != %(name)s
-				AND posting_date > %(posting_date)s
-				AND posting_time > %(posting_time)s
+				AND CONCAT(posting_date, ' ', posting_time) > CONCAT(%(posting_date)s, ' ', %(posting_time)s)
 				AND docstatus = 1
 				AND status = 'Queued'
 				AND based_on = 'Item and Warehouse'

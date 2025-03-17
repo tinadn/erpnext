@@ -6,8 +6,8 @@ import unittest
 import frappe
 
 from erpnext.accounts.doctype.tax_rule.tax_rule import ConflictingTaxRule, get_tax_template
-from crm.crm.doctype.opportunity.opportunity import make_quotation
-from crm.crm.doctype.opportunity.test_opportunity import make_opportunity
+from custom_crm.crm.doctype.opportunity.opportunity import make_quotation
+from custom_crm.crm.doctype.opportunity.test_opportunity import make_opportunity
 from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import  create_sales_invoice
 from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
 

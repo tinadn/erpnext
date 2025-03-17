@@ -16,7 +16,6 @@
      "bom_section",
      "update_bom_costs_automatically",
      "column_break_lhyt",
-     "manufacture_sub_assembly_in_operation",
      "section_break_6",
      "default_wip_warehouse",
      "default_fg_warehouse",
@@ -223,13 +222,6 @@
      {
       "fieldname": "column_break_lhyt",
       "fieldtype": "Column Break"
-     },
-     {
-      "default": "0",
-      "description": "If enabled then system will manufacture Sub-assembly against the Job Card (operation).",
-      "fieldname": "manufacture_sub_assembly_in_operation",
-      "fieldtype": "Check",
-      "label": "Manufacture Sub-assembly in Operation"
      },
      {
       "default": "0",

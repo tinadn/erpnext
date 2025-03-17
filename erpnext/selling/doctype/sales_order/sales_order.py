@@ -786,7 +786,8 @@ def make_material_request(source_name, target_doc=None):
 
 	def update_item(source, target, source_parent):
 		# qty is for packed items, because packed items don't have stock_qty field
-		target.project = source_parent.project
+		if "project" in frappe.get_installed_apps():
+			target.project = source_parent.project
 		target.qty = get_remaining_qty(source)
 		target.stock_qty = flt(target.qty) * flt(target.conversion_factor)
 		target.actual_qty = get_bin_details(

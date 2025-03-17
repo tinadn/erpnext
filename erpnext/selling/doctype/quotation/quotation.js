@@ -154,7 +154,7 @@ erpnext.selling.QuotationController = class QuotationController extends erpnext.
 				__("Opportunity"),
 				function () {
 					erpnext.utils.map_current_doc({
-						method: "crm.crm.doctype.opportunity.opportunity.make_quotation",
+						method: "custom_crm.crm.doctype.opportunity.opportunity.make_quotation",
 						source_doctype: "Opportunity",
 						target: me.frm,
 						setters: [
@@ -262,7 +262,7 @@ erpnext.selling.QuotationController = class QuotationController extends erpnext.
 		}
 
 		frappe.call({
-			method: "crm.crm.doctype.lead.lead.get_lead_details",
+			method: "custom_crm.crm.doctype.lead.lead.get_lead_details",
 			args: {
 				lead: this.frm.doc.party_name,
 				posting_date: this.frm.doc.transaction_date,

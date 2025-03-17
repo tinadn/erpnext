@@ -2683,7 +2683,7 @@ class TestDeliveryNote(FrappeTestCase):
 	def test_dn_submission_TC_SCK_148(self):
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 		from erpnext.buying.doctype.supplier.test_supplier import create_supplier
-		# from crm.crm.doctype.lead.lead import make_customer
+		# from custom_crm.crm.doctype.lead.lead import make_customer
 		from erpnext.stock.doctype.delivery_note.test_delivery_note import create_delivery_note
 		"""Test Purchase Receipt Creation, Submission, and Stock Ledger Update"""
 
