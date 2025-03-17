@@ -2947,7 +2947,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 	def test_tds_computation_summary_report_TC_ACC_094(self):
 		"""Test the TDS Computation Summary report for Purchase Invoice data."""
 		from frappe.desk.query_report import get_report_result
-
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
 		company = "_Test Company"
 		tds_account_args = {
 			"doctype": "Account",
