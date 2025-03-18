@@ -562,7 +562,9 @@ cur_frm.set_query("cash_bank_account", function(doc) {
 			["Account", "company", "=", doc.company]
 		]
 	};
+
 });
+
 
 cur_frm.fields_dict.write_off_account.get_query = function (doc) {
 	return {
