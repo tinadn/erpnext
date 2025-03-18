@@ -562,7 +562,6 @@ cur_frm.fields_dict("cash_bank_account", function(doc) {
 			["Account", "company", "=", doc.company],
 		],
 	};
-
 });
 
 
