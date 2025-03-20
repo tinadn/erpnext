@@ -549,6 +549,10 @@ class TestStockLedgerEntry(FrappeTestCase, StockTestMixin):
 		self.assertSLEs(sr2, expected_sles)
 
 	def test_batch_wise_valuation_across_warehouse(self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
+		from erpnext.selling.doctype.sales_order.test_sales_order import get_or_create_fiscal_year
+		create_company()
+		get_or_create_fiscal_year("_Test Company")
 		item_code, warehouses, batches = setup_item_valuation_test()
 		source = warehouses[0]
 		target = warehouses[1]
@@ -556,6 +560,7 @@ class TestStockLedgerEntry(FrappeTestCase, StockTestMixin):
 		unrelated_batch = make_stock_entry(
 			item_code=item_code, target=source, batch_no=batches[1], qty=5, rate=10
 		)
+		
 		self.assertSLEs(
 			unrelated_batch,
 			[

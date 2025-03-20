@@ -3244,12 +3244,7 @@ class TestPurchaseOrder(FrappeTestCase):
 	def test_outer_state_IGST_TC_B_098(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 		create_company()
-		company = "_Test Company"
-		if not frappe.db.exists("Tax Category", "Out-State"):
-			tax_category = frappe.new_doc("Tax Category")
-			tax_category.title = "Out-State"
-			tax_category.save()
-
+		company = "_Test Company"	
 		exists_purchase_tax = frappe.db.get_value('Purchase Taxes and Charges Template',{'company':company,'tax_category':'Out-State'},'name')
 		if exists_purchase_tax is None:
 			purchase_tax_and_template = frappe.new_doc("Purchase Taxes and Charges Template")
