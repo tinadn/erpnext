@@ -4820,6 +4820,7 @@ class TestMaterialRequest(FrappeTestCase):
 			account_name = acc.insert()
 		doc_po = make_purchase_order(mr.name)
 		doc_po.supplier = supplier
+		doc_po.currency = "INR"
 		doc_po.append("taxes", {
                     "charge_type": "On Net Total",
                     "account_head": account_name,

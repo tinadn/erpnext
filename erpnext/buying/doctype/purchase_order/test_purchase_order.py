@@ -950,7 +950,7 @@ class TestPurchaseOrder(FrappeTestCase):
 
 		frappe.db.set_single_value("Selling Settings", "maintain_same_sales_rate", 1)
 		frappe.db.set_single_value("Buying Settings", "maintain_same_rate", 1)
-
+		get_or_create_fiscal_year('_Test Company with perpetual inventory')
 		prepare_data_for_internal_transfer()
 		supplier = "_Test Internal Supplier 2"
 
@@ -4032,7 +4032,7 @@ class TestPurchaseOrder(FrappeTestCase):
 
 	def test_create_po_pr_return_pr_TC_SCK_178(self):
 		create_company()
-
+		get_or_create_fiscal_year('_Test Company PO')
 		supplier = create_supplier(supplier_name="_Test Supplier PO")
 		item = create_item("_Test PO")
 		warehouse = create_warehouse("_Test warehouse - _PO", company="_Test Company PO")
