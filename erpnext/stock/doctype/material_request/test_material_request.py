@@ -3205,9 +3205,10 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_mr_po_2pi_TC_SCK_083(self):
 		# MR =>  PO => 2PI
+		item = make_test_item("_test_item_1")
 		mr_dict_list = [{
 				"company" : "_Test Company",
-				"item_code" : "Testing-31",
+				"item_code" : item.item_code,
 				"warehouse" : "Stores - _TC",
 				"qty" : 10,
 				"rate" : 100,
@@ -4004,9 +4005,10 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_mr_po_pi_return_TC_SCK_090(self):
 		# MR =>  PO => PI => Return
+		item = make_test_item("_test_item_1")
 		mr_dict_list = [{
 				"company" : "_Test Company",
-				"item_code" : "Testing-31",
+				"item_code" : item.item_code,
 				"warehouse" : "Stores - _TC",
 				"qty" : 10,
 				"rate" : 100,
@@ -5050,26 +5052,30 @@ class TestMaterialRequest(FrappeTestCase):
 			properties={"parent_warehouse": "All Warehouses - _TC"},
 			company="_Test Company",
 		)
-		create_supplier(supplier_name="_Test Supplier")
-		frappe.db.set_value('Account','Creditors - _TC','account_currency','USD')
-		create_item("_Test Item")
+		warehouse = frappe.db.get_all('Warehouse',{'company':'_Test Company','is_group':0},['name'])[0].name
+		create_supplier(supplier_name="_Test Supplier",default_currency = "INR")
+		create_item("_Test Item",warehouse=warehouse)
 		
 		cost_center = frappe.db.get_all('Cost Center',{'company':'_Test Company'},['name'])
 		mr = make_material_request(uom = "Box",cost_center = cost_center[1].name)
+		
 		
 		#partially qty
 		po = make_purchase_order(mr.name)
 		po.supplier = "_Test Supplier"
 		po.get("items")[0].rate = 100
 		po.get("items")[0].qty = 5
+		po.currency = "INR"
 		po.insert()
 		po.submit()
+		
 
 		#remaining qty
 		po1 = make_purchase_order(mr.name)
 		po1.supplier = "_Test Supplier"
 		po1.get("items")[0].rate = 100
 		po1.get("items")[0].qty = 5
+		po1.currency = "INR"
 		po1.insert()
 		po1.submit()
 
@@ -7284,14 +7290,14 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(gl_stock_debit, 500)
 
 	def test_mr_2po_2pr_serl_part_retn_TC_SCK_212(self):
-		create_company()
-		create_fiscal_year()
-		company = "_Test Company MR"
-		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
-		supplier = create_supplier(supplier_name="_Test Supplier MR")
-		if not any(row.company == "_Test Company MR" for row in supplier.companies):
+		create_company("_Test Company")
+		create_fiscal_year("_Test Company")
+		company = "_Test Company"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company")
+		supplier = create_supplier(supplier_name="_Test Supplier")
+		if not any(row.company == "_Test Company" for row in supplier.companies):
 			supplier.append("companies", {
-				"company": "_Test Company MR",
+				"company": "_Test Company",
 			})
 		supplier.submit()
 		item_code = "_Test Item With Serial No"
@@ -7403,11 +7409,11 @@ class TestMaterialRequest(FrappeTestCase):
 		frappe.db.rollback()
 
 	def test_create_mr_to_2po_to_1pr_serl_part_retn_TC_SCK_213(self):
-		create_company()
-		create_fiscal_year()
-		company = "_Test Company MR"
-		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company MR")
-		supplier = create_supplier(supplier_name="_Test Supplier MR")
+		create_company("_Test Company")
+		create_fiscal_year("_Test Company")
+		company = "_Test Company"
+		warehouse = create_warehouse("_Test warehouse PO", company="_Test Company")
+		supplier = create_supplier(supplier_name="_Test Supplier")
 		item_code = "_Test Item With Serial No"
 
 		if not frappe.db.exists("Item", item_code):
@@ -8026,6 +8032,7 @@ def make_test_po(source_name, type = "Material Request", received_qty = 0, item_
 		args = frappe._dict(args)
 		doc_po.update(args)
 
+	doc_po.currency = "INR"
 	doc_po.insert()
 	doc_po.submit()
 	return doc_po
