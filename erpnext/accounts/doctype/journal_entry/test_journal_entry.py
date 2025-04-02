@@ -148,7 +148,7 @@ class TestJournalEntry(unittest.TestCase):
 		)
 
 		if account_bal == stock_bal:
-			self.assertRaises(StockAccountInvalidTransaction, jv.save)
+			self.assertRaises(StockAccountInvalidTransaction, jv.submit)
 			frappe.db.rollback()
 		else:
 			jv.submit()
@@ -229,14 +229,6 @@ class TestJournalEntry(unittest.TestCase):
 
 		self.expected_gle = [
 			{
-				"account": "_Test Bank USD - _TC",
-				"account_currency": "USD",
-				"debit": 0,
-				"debit_in_account_currency": 0,
-				"credit": 5000,
-				"credit_in_account_currency": 100,
-			},
-			{
 				"account": "Sales - _TC",
 				"account_currency": "INR",
 				"debit": 5000,
@@ -244,6 +236,14 @@ class TestJournalEntry(unittest.TestCase):
 				"credit": 0,
 				"credit_in_account_currency": 0,
 			},
+			{
+				"account": "_Test Bank USD - _TC",
+				"account_currency": "USD",
+				"debit": 0,
+				"debit_in_account_currency": 0,
+				"credit": 5000,
+				"credit_in_account_currency": 100,
+			}
 		]
 
 		self.check_gl_entries()

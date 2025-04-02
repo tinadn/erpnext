@@ -27,6 +27,7 @@ from frappe.utils import (
 )
 from pypika import Order
 from pypika.terms import ExistsCriterion
+from pypika.functions import Min
 
 import erpnext
 

@@ -1081,11 +1081,11 @@ class TestPaymentEntry(FrappeTestCase):
 			.run()
 		)
 
-		expected_gl_entries = (
-			("_Test Account Service Tax - _TC", 100.0, 0.0, 100.0, 0.0),
-			("_Test Bank - _TC", 0.0, 1100.0, 0.0, 1100.0),
-			("_Test Payable USD - _TC", 1000.0, 0.0, 12.5, 0),
-		)
+		expected_gl_entries = [
+			('_Test Account Service Tax - _TC', 100.0, 0.0, 100.0, 0.0), 
+			('_Test Bank - _TC', 0.0, 1100.0, 0.0, 1100.0), 
+			('_Test Payable USD - _TC', 1000.0, 0.0, 12.5, 0.0)
+		]
 
 		self.assertEqual(gl_entries, expected_gl_entries)
 
@@ -1175,7 +1175,7 @@ class TestPaymentEntry(FrappeTestCase):
 		Validate Allocation on Payment Entry based on Payment Schedule. Upon overallocation, validation error must be thrown.
 
 		"""
-		customer = create_customer()
+		customer = create_customer(currency = "INR")
 		create_payment_terms_template()
 
 		# Validate allocation on base/company currency
@@ -1232,7 +1232,7 @@ class TestPaymentEntry(FrappeTestCase):
 		# when invoice is made is foreign currency, but posted to base/company currency debtors account
 		si3 = create_sales_invoice(
 			customer=customer,
-			currency="USD",
+			currency="INR",
 			conversion_rate=80,
 			do_not_save=1,
 		)
@@ -1336,8 +1336,9 @@ class TestPaymentEntry(FrappeTestCase):
 		)
 		self.voucher_no = pe.name
 		self.expected_gle = [
-			{"account": "Creditors - _TC", "debit": 0.0, "credit": 1000.0},
 			{"account": "_Test Cash - _TC", "debit": 1000.0, "credit": 0.0},
+			{"account": "Creditors - _TC", "debit": 0.0, "credit": 1000.0}
+			
 		]
 		self.check_gl_entries()
 
@@ -1383,10 +1384,11 @@ class TestPaymentEntry(FrappeTestCase):
 		self.assertEqual(pe.unallocated_amount, 940)
 		self.voucher_no = pe.name
 		self.expected_gle = [
+			{"account": "_Test Cash - _TC", "debit": 1000.0, "credit": 0.0},
 			{"account": "Debtors - _TC", "debit": 40.0, "credit": 0.0},
 			{"account": "Debtors - _TC", "debit": 0.0, "credit": 940.0},
-			{"account": "Debtors - _TC", "debit": 0.0, "credit": 100.0},
-			{"account": "_Test Cash - _TC", "debit": 1000.0, "credit": 0.0},
+			{"account": "Debtors - _TC", "debit": 0.0, "credit": 100.0}
+			
 		]
 		self.check_gl_entries()
 
