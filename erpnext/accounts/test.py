@@ -935,106 +935,21 @@ def update_accounting_ledgers_after_reference_removal(
 
 
 
-# def reverse_payment_ledger_entries(ref_type, ref_no):
-#     ple = DocType("Payment Ledger Entry")
-#     sales_invoice = DocType("Sales Invoice")
-
-#     # Fetch original records based on against_voucher_type and against_voucher_no
-#     original_entries_pe = (
-#         frappe.qb.from_(ple)
-#         .select(ple.name, ple.voucher_type, ple.voucher_no, ple.amount, ple.amount_in_account_currency,ple.against_voucher_type,ple.against_voucher_no,ple.account_type,ple.account,ple.party,ple.party_type,ple.company,ple.account_currency)
-#         .where((ple.against_voucher_type == ref_type) & (ple.against_voucher_no == ref_no))
-#     ).run(as_dict=True)
-
-#     original_entries_si = (
-#         frappe.qb.from_(ple)
-#         .select(ple.name, ple.voucher_type, ple.voucher_no, ple.amount, ple.amount_in_account_currency,ple.against_voucher_type,ple.against_voucher_no,ple.account_type,ple.account,ple.party,ple.party_type,ple.account_currency,ple.company)
-#         .where((ple.voucher_type == ref_type) & (ple.voucher_no == ref_no))
-#     ).run(as_dict=True)
-
-#     # frappe.log_error("original_entries_pe",original_entries_pe)
-#     # frappe.log_error("original_entries_si",original_entries_si)
-
-#     if not original_entries_pe:
-#         return "No matching Payment Ledger Entry found"
-
-#     if not original_entries_si:
-#         return "No matching Payment Ledger Entry found"
-
-
-#     total_entries=original_entries_pe+original_entries_si
-#     # frappe.log_error("total_entries",total_entries)
-#     new_entries = []
-#     amount=0
-
-#     for record in total_entries:
-#         if not record["against_voucher_no"]:
-#             # frappe.db.set_value("Payment Ledger Entry",record["name"],"amount_in_account_currency",record["amount"])
-#             amount=record["amount"]
-#             return
-
-#         # Reverse amount values
-#         reversed_amount = -float(record["amount"])
-#         reversed_amount_currency = -float(record["amount"])
-
-#         # Create new reversed entry
-#         new_ple = frappe.get_doc({
-#             "doctype": "Payment Ledger Entry",
-#             "voucher_type": record["voucher_type"],
-#             "posting_date":nowdate(),
-#             "company":record["company"],
-#             "currency":record["account_currency"],
-# 			"voucher_type":record["voucher_type"],
-#             "voucher_no": record["voucher_no"],
-#             "against_voucher_type": record["against_voucher_type"],
-#             "against_voucher_no": record["against_voucher_no"],
-#             "amount": reversed_amount,
-#             "amount_in_account_currency": reversed_amount_currency,
-#             "status": "Reversed",
-#             "account_type": record["account_type"],
-#             "account": record["account"],
-#             "party": record["party"],
-#             "party_type": record["party_type"],
-#             "due_date": nowdate()  # Set due date as current date
-#         })
-#         new_ple.insert()
-#         new_entries.append(new_ple.name)
-
-#     # # Update outstanding amount in Sales Invoice
-#     # frappe.db.sql(
-#     #     """
-#     #     UPDATE `tabSales Invoice`
-#     #     SET outstanding_amount = outstanding_amount + (
-#     #         SELECT SUM(amount) FROM `tabPayment Ledger Entry`
-#     #         WHERE against_voucher_type = %s AND against_voucher_no = %s amount < 0
-#     #     )
-#     #     WHERE name = %s
-#     #     """,
-#     #     (ref_type, ref_no, ref_no)
-#     # )
-#     frappe.db.set_value("Sales Invoice",ref_no,{"outstanding_amount":amount})
-
-#     frappe.db.commit()
-    
-#     return {"new_entries": new_entries, "sales_invoice_updated": ref_no}
-
-
-
 def reverse_payment_ledger_entries(ref_type, ref_no):
     ple = DocType("Payment Ledger Entry")
-    sales_invoice = DocType(ref_type)
+    sales_invoice = DocType("Sales Invoice")
 
     # Fetch original records based on against_voucher_type and against_voucher_no
     original_entries_pe = (
         frappe.qb.from_(ple)
         .select(ple.name, ple.voucher_type, ple.voucher_no, ple.amount, ple.amount_in_account_currency,ple.against_voucher_type,ple.against_voucher_no,ple.account_type,ple.account,ple.party,ple.party_type,ple.company,ple.account_currency)
-        .where((ple.against_voucher_type == ref_type) & (ple.against_voucher_no == ref_no) & (ple.delinked == 0))
+        .where((ple.against_voucher_type == ref_type) & (ple.against_voucher_no == ref_no))
     ).run(as_dict=True)
 
     original_entries_si = (
         frappe.qb.from_(ple)
         .select(ple.name, ple.voucher_type, ple.voucher_no, ple.amount, ple.amount_in_account_currency,ple.against_voucher_type,ple.against_voucher_no,ple.account_type,ple.account,ple.party,ple.party_type,ple.account_currency,ple.company)
-        .where((ple.voucher_type == ref_type) & (ple.voucher_no == ref_no)  & (ple.delinked == 0))
+        .where((ple.voucher_type == ref_type) & (ple.voucher_no == ref_no))
     ).run(as_dict=True)
 
     # frappe.log_error("original_entries_pe",original_entries_pe)
@@ -1048,7 +963,7 @@ def reverse_payment_ledger_entries(ref_type, ref_no):
 
 
     total_entries=original_entries_pe+original_entries_si
-    frappe.log_error("total_entries",total_entries)
+    # frappe.log_error("total_entries",total_entries)
     new_entries = []
     amount=0
 
@@ -1056,37 +971,34 @@ def reverse_payment_ledger_entries(ref_type, ref_no):
         if not record["against_voucher_no"]:
             # frappe.db.set_value("Payment Ledger Entry",record["name"],"amount_in_account_currency",record["amount"])
             amount=record["amount"]
-            pass
+            return
 
         # Reverse amount values
-        if record["against_voucher_no"]:
-            reversed_amount = -float(record["amount"])
-            reversed_amount_currency = -float(record["amount"])
+        reversed_amount = -float(record["amount"])
+        reversed_amount_currency = -float(record["amount"])
 
-            # Create new reversed entry
-            new_ple = frappe.get_doc({
-                "doctype": "Payment Ledger Entry",
-                "voucher_type": record["voucher_type"],
-                "posting_date":nowdate(),
-                "company":record["company"],
-                "currency":record["account_currency"],
-                "voucher_type":record["voucher_type"],
-                "voucher_no": record["voucher_no"],
-                "against_voucher_type": record["against_voucher_type"],
-                "against_voucher_no": record["against_voucher_no"],
-                "amount": reversed_amount,
-                "amount_in_account_currency": reversed_amount_currency,
-                "status": "Reversed",
-                "account_type": record["account_type"],
-                "account": record["account"],
-                "party": record["party"],
-                "party_type": record["party_type"],
-                "due_date": nowdate(),  # Set due date as current date
-                "delinked": 1
-            })
-            new_ple.insert()
-            new_entries.append(new_ple.name)	
-            frappe.db.set_value("Payment Ledger Entry",record["name"],"delinked",1)
+        # Create new reversed entry
+        new_ple = frappe.get_doc({
+            "doctype": "Payment Ledger Entry",
+            "voucher_type": record["voucher_type"],
+            "posting_date":nowdate(),
+            "company":record["company"],
+            "currency":record["account_currency"],
+			"voucher_type":record["voucher_type"],
+            "voucher_no": record["voucher_no"],
+            "against_voucher_type": record["against_voucher_type"],
+            "against_voucher_no": record["against_voucher_no"],
+            "amount": reversed_amount,
+            "amount_in_account_currency": reversed_amount_currency,
+            "status": "Reversed",
+            "account_type": record["account_type"],
+            "account": record["account"],
+            "party": record["party"],
+            "party_type": record["party_type"],
+            "due_date": nowdate()  # Set due date as current date
+        })
+        new_ple.insert()
+        new_entries.append(new_ple.name)
 
     # # Update outstanding amount in Sales Invoice
     # frappe.db.sql(
@@ -1096,16 +1008,19 @@ def reverse_payment_ledger_entries(ref_type, ref_no):
     #         SELECT SUM(amount) FROM `tabPayment Ledger Entry`
     #         WHERE against_voucher_type = %s AND against_voucher_no = %s amount < 0
     #     )
-    #     WHERE name = %s and delinked = 1
+    #     WHERE name = %s
     #     """,
     #     (ref_type, ref_no, ref_no)
     # )
     frappe.db.set_value("Sales Invoice",ref_no,{"outstanding_amount":amount})
-    # frappe.log_error("new_entries",new_entries)
 
     frappe.db.commit()
     
     return {"new_entries": new_entries, "sales_invoice_updated": ref_no}
+
+
+
+
 
 
 
@@ -2290,157 +2205,6 @@ class QueryPaymentLedger:
 				)
 
 		# build query for voucher amount
-		# query_voucher_amount = (
-		# 	qb.from_(ple)
-		# 	.select(
-		# 		ple.account,
-		# 		ple.voucher_type,
-		# 		ple.voucher_no,
-		# 		ple.party_type,
-		# 		ple.party,
-		# 		ple.posting_date,
-		# 		ple.due_date,
-		# 		ple.account_currency.as_("currency"),
-		# 		ple.cost_center.as_("cost_center"),
-		# 		Sum(ple.amount).as_("amount"),
-		# 		Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
-		# 		ple.remarks,
-		# 	)
-		# 	.where(ple.delinked == 0)
-		# 	.where(Criterion.all(filter_on_voucher_no))
-		# 	.where(ple.against_voucher_no != ' ')
-		# 	.where(Criterion.all(self.common_filter))
-		# 	.where(Criterion.all(self.dimensions_filter))
-		# 	.where(Criterion.all(self.voucher_posting_date))
-		# 	.groupby(ple.account, ple.voucher_type, ple.voucher_no, ple.party_type, ple.party, ple.posting_date, ple.due_date, ple.account_currency, ple.cost_center, ple.remarks)
-		# )
-
-		# frappe.log_error("query_voucher_amount",query_voucher_amount)
-
-		# # build query for voucher outstanding
-		# query_voucher_outstanding = (
-		# 	qb.from_(ple)
-		# 	.select(
-		# 		ple.account,
-		# 		ple.voucher_type.as_("voucher_type"),
-		# 		ple.voucher_no.as_("voucher_no"),
-		# 		ple.party_type,
-		# 		ple.party,
-		# 		ple.posting_date,
-		# 		ple.due_date,
-		# 		ple.account_currency.as_("currency"),
-		# 		Sum(ple.amount).as_("amount"),
-		# 		Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
-		# 	)
-		# 	.where(ple.delinked == 0)
-		# 	.where(ple.against_voucher_no != ' ')
-		# 	.where(Criterion.all(filter_on_against_voucher_no))
-		# 	.where(Criterion.all(self.common_filter))
-		# 	.groupby(ple.account, ple.voucher_type, ple.voucher_no, ple.party_type,ple.party, ple.account_currency, ple.posting_date, ple.due_date )
-		# )
-
-		# frappe.log_error("query_voucher_outstanding out",query_voucher_outstanding)
-
-
-
-		# # build CTE for combining voucher amount and outstanding
-		# self.cte_query_voucher_amount_and_outstanding = (
-		# 	qb.with_(query_voucher_amount, "vouchers")
-		# 	.with_(query_voucher_outstanding, "outstanding")
-		# 	.from_(AliasedQuery("vouchers"))
-		# 	.left_join(AliasedQuery("outstanding"))
-		# 	.on(
-		# 		(AliasedQuery("vouchers").account == AliasedQuery("outstanding").account)
-		# 		& (AliasedQuery("vouchers").voucher_type == AliasedQuery("outstanding").voucher_type)
-		# 		& (AliasedQuery("vouchers").voucher_no == AliasedQuery("outstanding").voucher_no)
-		# 		& (AliasedQuery("vouchers").party_type == AliasedQuery("outstanding").party_type)
-		# 		& (AliasedQuery("vouchers").party == AliasedQuery("outstanding").party)
-		# 	)
-		# 	.select(
-		# 		Table("vouchers").account,
-		# 		Table("vouchers").voucher_type,
-		# 		Table("vouchers").voucher_no,
-		# 		Table("vouchers").party_type,
-		# 		Table("vouchers").party,
-		# 		Table("vouchers").posting_date,
-		# 		Table("vouchers").amount.as_("invoice_amount"),
-		# 		Table("vouchers").amount_in_account_currency.as_("invoice_amount_in_account_currency"),
-		# 		Table("outstanding").amount.as_("outstanding"),
-		# 		Table("outstanding").amount_in_account_currency.as_("outstanding_in_account_currency"),
-		# 		(Table("vouchers").amount - Table("outstanding").amount).as_("paid_amount"),
-		# 		(
-		# 			Table("vouchers").amount_in_account_currency
-		# 			- Table("outstanding").amount_in_account_currency
-		# 		).as_("paid_amount_in_account_currency"),
-		# 		Table("vouchers").due_date,
-		# 		Table("vouchers").currency,
-		# 		Table("vouchers").cost_center.as_("cost_center"),
-		# 		Table("vouchers").remarks,
-		# 	)
-		# 	.groupby(
-		# 		Table("vouchers").account,
-		# 		Table("vouchers").voucher_type,
-		# 		Table("vouchers").voucher_no,
-		# 		Table("vouchers").party_type,
-		# 		Table("vouchers").party,
-		# 		Table("vouchers").posting_date,
-		# 		Table("vouchers").due_date,
-		# 		Table("vouchers").currency,
-		# 		Table("vouchers").cost_center,
-		# 		Table("vouchers").amount,
-		# 		Table("outstanding").amount,
-		# 		Table("vouchers").amount_in_account_currency,
-		# 		Table("outstanding").amount_in_account_currency,
-		# 		Table("vouchers").remarks
-		# 			)
-		# 	.where(Criterion.all(filter_on_outstanding_amount))
-		# )
-		
-		
-		# # build CTE filter
-		# # only fetch invoices
-		# if self.get_invoices:
-		# 	self.cte_query_voucher_amount_and_outstanding = (
-		# 		self.cte_query_voucher_amount_and_outstanding.having(
-		# 			(Table("outstanding").amount_in_account_currency > 0)
-		# 		)
-		# 	)
-		# 	frappe.log_error("self.cte_query_voucher_amount_and_outstanding",self.cte_query_voucher_amount_and_outstanding.run(as_dict=True,debug=1))
-		# # only fetch payments
-		# elif self.get_payments:
-		# 	self.cte_query_voucher_amount_and_outstanding = (
-		# 		self.cte_query_voucher_amount_and_outstanding.having(
-		# 			(Table("outstanding").amount_in_account_currency < 0)
-		# 		)
-		# 	)
-
-		# if self.limit:
-		# 	self.cte_query_voucher_amount_and_outstanding = (
-		# 		self.cte_query_voucher_amount_and_outstanding.limit(self.limit)
-		# 	)
-
-		# Define a CTE for fully reconciled vouchers
-		reconciled_vouchers = (
-			qb.from_(ple)
-			.select(ple.voucher_no)
-			.where(ple.delinked == 0)
-			.where(Criterion.all(filter_on_voucher_no))
-			.where(Criterion.all(self.common_filter))
-			.where(Criterion.all(self.dimensions_filter))
-			.where(Criterion.all(self.voucher_posting_date))
-			.groupby(ple.voucher_no)
-			.having(Sum(ple.amount) == 0)
-			.having(Sum(ple.amount_in_account_currency) == 0)
-		)
-
-		# Define a CTE for linked reconciled vouchers
-		linked_reconciled_vouchers = (
-			qb.from_(ple)
-			.select(ple.voucher_no)
-			.where(ple.against_voucher_no.isin(reconciled_vouchers))
-		)
-
-		# Query for voucher amount
 		query_voucher_amount = (
 			qb.from_(ple)
 			.select(
@@ -2459,20 +2223,16 @@ class QueryPaymentLedger:
 			)
 			.where(ple.delinked == 0)
 			.where(Criterion.all(filter_on_voucher_no))
-			.where(Criterion.any([ple.against_voucher_no != '', ple.against_voucher_no.isnotnull()]))
+			.where(ple.against_voucher_no != ' ')
 			.where(Criterion.all(self.common_filter))
 			.where(Criterion.all(self.dimensions_filter))
 			.where(Criterion.all(self.voucher_posting_date))
-			.where(ple.voucher_no.notin(reconciled_vouchers))
-			.where(ple.voucher_no.notin(linked_reconciled_vouchers))
-			.groupby(
-				ple.account, ple.voucher_type, ple.voucher_no, ple.party_type, ple.party, 
-				ple.posting_date, ple.due_date, ple.account_currency, ple.cost_center, ple.remarks
-			)
+			.groupby(ple.account, ple.voucher_type, ple.voucher_no, ple.party_type, ple.party, ple.posting_date, ple.due_date, ple.account_currency, ple.cost_center, ple.remarks)
 		)
-		frappe.log_error("query_voucher_amount out",query_voucher_amount)
 
-		# Query for voucher outstanding
+		frappe.log_error("query_voucher_amount",query_voucher_amount)
+
+		# build query for voucher outstanding
 		query_voucher_outstanding = (
 			qb.from_(ple)
 			.select(
@@ -2488,26 +2248,17 @@ class QueryPaymentLedger:
 				Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
 			)
 			.where(ple.delinked == 0)
-			.where(Criterion.any([
-				ple.against_voucher_no.isnull(),
-				ple.against_voucher_no == ''
-			]))  # Ensure payments that are not linked are captured
+			.where(ple.against_voucher_no != ' ')
 			.where(Criterion.all(filter_on_against_voucher_no))
 			.where(Criterion.all(self.common_filter))
-			.where(ple.voucher_no.notin(reconciled_vouchers))
-			.where(ple.voucher_no.notin(linked_reconciled_vouchers))
-			.groupby(
-				ple.account, ple.voucher_type, ple.voucher_no, ple.party_type,
-				ple.party, ple.account_currency, ple.posting_date, ple.due_date
-			)
-			.having(
-				Sum(ple.amount_in_account_currency) != 0  # Only show partially or unpaid invoices
-			)
+			.groupby(ple.account, ple.voucher_type, ple.voucher_no, ple.party_type,ple.party, ple.account_currency, ple.posting_date, ple.due_date )
 		)
+
 		frappe.log_error("query_voucher_outstanding out",query_voucher_outstanding)
 
 
-		# Combine voucher amount and outstanding using a CTE
+
+		# build CTE for combining voucher amount and outstanding
 		self.cte_query_voucher_amount_and_outstanding = (
 			qb.with_(query_voucher_amount, "vouchers")
 			.with_(query_voucher_outstanding, "outstanding")
@@ -2556,19 +2307,21 @@ class QueryPaymentLedger:
 				Table("vouchers").amount_in_account_currency,
 				Table("outstanding").amount_in_account_currency,
 				Table("vouchers").remarks
-			)
+					)
 			.where(Criterion.all(filter_on_outstanding_amount))
 		)
-
-		# Filter for invoices
+		
+		
+		# build CTE filter
+		# only fetch invoices
 		if self.get_invoices:
 			self.cte_query_voucher_amount_and_outstanding = (
 				self.cte_query_voucher_amount_and_outstanding.having(
 					(Table("outstanding").amount_in_account_currency > 0)
 				)
 			)
-
-		# Filter for payments
+			frappe.log_error("self.cte_query_voucher_amount_and_outstanding",self.cte_query_voucher_amount_and_outstanding.run(as_dict=True,debug=1))
+		# only fetch payments
 		elif self.get_payments:
 			self.cte_query_voucher_amount_and_outstanding = (
 				self.cte_query_voucher_amount_and_outstanding.having(
@@ -2576,11 +2329,173 @@ class QueryPaymentLedger:
 				)
 			)
 
-		# Apply limit if necessary
 		if self.limit:
 			self.cte_query_voucher_amount_and_outstanding = (
 				self.cte_query_voucher_amount_and_outstanding.limit(self.limit)
 			)
+
+		# Define a CTE for fully reconciled vouchers
+		# reconciled_vouchers = (
+		# 	qb.from_(ple)
+		# 	.select(ple.voucher_no)
+		# 	.where(ple.delinked == 0)
+		# 	.where(Criterion.all(filter_on_voucher_no))
+		# 	.where(Criterion.all(self.common_filter))
+		# 	.where(Criterion.all(self.dimensions_filter))
+		# 	.where(Criterion.all(self.voucher_posting_date))
+		# 	.groupby(ple.voucher_no)
+		# 	.having(Sum(ple.amount) == 0)
+		# 	.having(Sum(ple.amount_in_account_currency) == 0)
+		# )
+
+		# # Define a CTE for linked reconciled vouchers
+		# linked_reconciled_vouchers = (
+		# 	qb.from_(ple)
+		# 	.select(ple.voucher_no)
+		# 	.where(ple.against_voucher_no.isin(reconciled_vouchers))
+		# )
+
+		# # Query for voucher amount
+		# query_voucher_amount = (
+		# 	qb.from_(ple)
+		# 	.select(
+		# 		ple.account,
+		# 		ple.voucher_type,
+		# 		ple.voucher_no,
+		# 		ple.party_type,
+		# 		ple.party,
+		# 		ple.posting_date,
+		# 		ple.due_date,
+		# 		ple.account_currency.as_("currency"),
+		# 		ple.cost_center.as_("cost_center"),
+		# 		Sum(ple.amount).as_("amount"),
+		# 		Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
+		# 		ple.remarks,
+		# 	)
+		# 	.where(ple.delinked == 0)
+		# 	.where(Criterion.all(filter_on_voucher_no))
+		# 	.where(Criterion.any([ple.against_voucher_no != '', ple.against_voucher_no.isnotnull()]))
+		# 	.where(Criterion.all(self.common_filter))
+		# 	.where(Criterion.all(self.dimensions_filter))
+		# 	.where(Criterion.all(self.voucher_posting_date))
+		# 	.where(ple.voucher_no.notin(reconciled_vouchers))
+		# 	.where(ple.voucher_no.notin(linked_reconciled_vouchers))
+		# 	.groupby(
+		# 		ple.account, ple.voucher_type, ple.voucher_no, ple.party_type, ple.party, 
+		# 		ple.posting_date, ple.due_date, ple.account_currency, ple.cost_center, ple.remarks
+		# 	)
+		# )
+		# frappe.log_error("query_voucher_amount out",query_voucher_amount)
+
+		# # Query for voucher outstanding
+		# query_voucher_outstanding = (
+		# 	qb.from_(ple)
+		# 	.select(
+		# 		ple.account,
+		# 		ple.voucher_type.as_("voucher_type"),
+		# 		ple.voucher_no.as_("voucher_no"),
+		# 		ple.party_type,
+		# 		ple.party,
+		# 		ple.posting_date,
+		# 		ple.due_date,
+		# 		ple.account_currency.as_("currency"),
+		# 		Sum(ple.amount).as_("amount"),
+		# 		Sum(ple.amount_in_account_currency).as_("amount_in_account_currency"),
+		# 	)
+		# 	.where(ple.delinked == 0)
+		# 	.where(Criterion.any([
+		# 		ple.against_voucher_no.isnull(),
+		# 		ple.against_voucher_no == ''
+		# 	]))  # Ensure payments that are not linked are captured
+		# 	.where(Criterion.all(filter_on_against_voucher_no))
+		# 	.where(Criterion.all(self.common_filter))
+		# 	.where(ple.voucher_no.notin(reconciled_vouchers))
+		# 	.where(ple.voucher_no.notin(linked_reconciled_vouchers))
+		# 	.groupby(
+		# 		ple.account, ple.voucher_type, ple.voucher_no, ple.party_type,
+		# 		ple.party, ple.account_currency, ple.posting_date, ple.due_date
+		# 	)
+		# 	.having(
+		# 		Sum(ple.amount_in_account_currency) != 0  # Only show partially or unpaid invoices
+		# 	)
+		# )
+		# frappe.log_error("query_voucher_outstanding out",query_voucher_outstanding)
+
+
+		# # Combine voucher amount and outstanding using a CTE
+		# self.cte_query_voucher_amount_and_outstanding = (
+		# 	qb.with_(query_voucher_amount, "vouchers")
+		# 	.with_(query_voucher_outstanding, "outstanding")
+		# 	.from_(AliasedQuery("vouchers"))
+		# 	.left_join(AliasedQuery("outstanding"))
+		# 	.on(
+		# 		(AliasedQuery("vouchers").account == AliasedQuery("outstanding").account)
+		# 		& (AliasedQuery("vouchers").voucher_type == AliasedQuery("outstanding").voucher_type)
+		# 		& (AliasedQuery("vouchers").voucher_no == AliasedQuery("outstanding").voucher_no)
+		# 		& (AliasedQuery("vouchers").party_type == AliasedQuery("outstanding").party_type)
+		# 		& (AliasedQuery("vouchers").party == AliasedQuery("outstanding").party)
+		# 	)
+		# 	.select(
+		# 		Table("vouchers").account,
+		# 		Table("vouchers").voucher_type,
+		# 		Table("vouchers").voucher_no,
+		# 		Table("vouchers").party_type,
+		# 		Table("vouchers").party,
+		# 		Table("vouchers").posting_date,
+		# 		Table("vouchers").amount.as_("invoice_amount"),
+		# 		Table("vouchers").amount_in_account_currency.as_("invoice_amount_in_account_currency"),
+		# 		Table("outstanding").amount.as_("outstanding"),
+		# 		Table("outstanding").amount_in_account_currency.as_("outstanding_in_account_currency"),
+		# 		(Table("vouchers").amount - Table("outstanding").amount).as_("paid_amount"),
+		# 		(
+		# 			Table("vouchers").amount_in_account_currency
+		# 			- Table("outstanding").amount_in_account_currency
+		# 		).as_("paid_amount_in_account_currency"),
+		# 		Table("vouchers").due_date,
+		# 		Table("vouchers").currency,
+		# 		Table("vouchers").cost_center.as_("cost_center"),
+		# 		Table("vouchers").remarks,
+		# 	)
+		# 	.groupby(
+		# 		Table("vouchers").account,
+		# 		Table("vouchers").voucher_type,
+		# 		Table("vouchers").voucher_no,
+		# 		Table("vouchers").party_type,
+		# 		Table("vouchers").party,
+		# 		Table("vouchers").posting_date,
+		# 		Table("vouchers").due_date,
+		# 		Table("vouchers").currency,
+		# 		Table("vouchers").cost_center,
+		# 		Table("vouchers").amount,
+		# 		Table("outstanding").amount,
+		# 		Table("vouchers").amount_in_account_currency,
+		# 		Table("outstanding").amount_in_account_currency,
+		# 		Table("vouchers").remarks
+		# 	)
+		# 	.where(Criterion.all(filter_on_outstanding_amount))
+		# )
+
+		# # Filter for invoices
+		# if self.get_invoices:
+		# 	self.cte_query_voucher_amount_and_outstanding = (
+		# 		self.cte_query_voucher_amount_and_outstanding.having(
+		# 			(Table("outstanding").amount_in_account_currency > 0)
+		# 		)
+		# 	)
+
+		# # Filter for payments
+		# elif self.get_payments:
+		# 	self.cte_query_voucher_amount_and_outstanding = (
+		# 		self.cte_query_voucher_amount_and_outstanding.having(
+		# 			(Table("outstanding").amount_in_account_currency < 0)
+		# 		)
+		# 	)
+
+		# # Apply limit if necessary
+		# if self.limit:
+		# 	self.cte_query_voucher_amount_and_outstanding = (
+		# 		self.cte_query_voucher_amount_and_outstanding.limit(self.limit)
+		# 	)
 
 
 		# execute SQL

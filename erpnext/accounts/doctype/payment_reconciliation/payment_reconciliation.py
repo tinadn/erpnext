@@ -374,6 +374,7 @@ class PaymentReconciliation(Document):
 		non_reconciled_invoices = sorted(
 			non_reconciled_invoices, key=lambda k: k["posting_date"] or getdate(nowdate())
 		)
+
 		
 
 		self.add_invoice_entries(non_reconciled_invoices)
