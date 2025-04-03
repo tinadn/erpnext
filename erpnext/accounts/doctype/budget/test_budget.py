@@ -38,6 +38,7 @@ class TestBudget(unittest.TestCase):
 		budget.cancel()
 		jv.cancel()
 
+	@if_app_installed("projects")
 	def test_monthly_budget_crossed_stop1(self):
 		set_total_expense_zero(nowdate(), "cost_center")
 
@@ -58,6 +59,7 @@ class TestBudget(unittest.TestCase):
 		budget.load_from_db()
 		budget.cancel()
 
+	@if_app_installed("projects")
 	def test_exception_approver_role(self):
 		set_total_expense_zero(nowdate(), "cost_center")
 
@@ -149,6 +151,7 @@ class TestBudget(unittest.TestCase):
 		budget.cancel()
 		po.cancel()
 
+	@if_app_installed("projects")
 	def test_monthly_budget_crossed_stop2(self):
 		set_total_expense_zero(nowdate(), "project")
 
