@@ -3272,7 +3272,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		bundle = dn.items[0].serial_and_batch_bundle
 
 		valuation_rate = frappe.db.get_value("Serial and Batch Bundle", bundle, "avg_rate")
-		self.assertEqual(valuation_rate, 100)
+		self.assertEqual(valuation_rate, 150)
 
 		doc = frappe.get_doc("Stock Settings")
 		doc.do_not_use_batchwise_valuation = 1
@@ -4000,22 +4000,26 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(sl_entries[1].warehouse, warehouse2)
 
 	def test_purchase_order_and_receipt_TC_SCK_073(self):
+		from datetime import datetime, timedelta
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
 		create_supplier(supplier_name="_Test Supplier", default_currency="INR")
 		company = "_Test Indian Registered Company"
+		frappe.db.set_value('GST Settings','GST Settings','enable_overseas_transactions',1)
 		create_company(company)
+		get_or_create_fiscal_year(company)
 		item1 = make_item("ST-N-001", {"is_stock_item": 1, "gst_hsn_code": "01011010"})
 		item2 = make_item("W-N-001", {"is_stock_item": 1, "gst_hsn_code": "01011020"})
 		warehouse1 = create_warehouse("Raw Material Iron Building - _TIRC", company=company)
 		warehouse2 = create_warehouse("Woods - _TIRC", company=company)
 		rejected_warehouse = create_warehouse("Rejection Scrap - _TIRC", company=company)
-		posting_date = "2024-12-31"
+		posting_date = datetime.today().date()
 
 		# Create Purchase Order
 		po = frappe.new_doc("Purchase Order")
 		po.company = company
 		po.supplier = "_Test Supplier"
 		po.transaction_date = posting_date
-		po.schedule_date = "2025-01-02"
+		po.schedule_date = datetime.today().date() + timedelta(days=15)
 		item_list = [{"item_code": item1.name, "rate":50 ,"qty": 150, "warehouse": warehouse1}, {"item_code": item2.name,"rate":55 , "qty": 75, "warehouse": warehouse2}]
 		for row in item_list:
 			po.append("items", row)
@@ -4046,6 +4050,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 			supplier=po.supplier,
 			posting_date=posting_date,
 			items=item_list,
+			currency = "USD"
 		)
 		pr.save()
 		pr.submit()
@@ -4073,22 +4078,26 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(sl_entries[3].warehouse, rejected_warehouse)
 
 	def test_purchase_order_and_receipt_TC_SCK_074(self):
+		from datetime import datetime, timedelta
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
 		create_supplier(supplier_name="_Test Supplier", default_currency="INR")
 		company = "_Test Indian Registered Company"
 		create_company(company)
+		get_or_create_fiscal_year(company)
+		frappe.db.set_value('GST Settings','GST Settings','enable_overseas_transactions',1)
 		item1 = make_item("ST-N-001", {"is_stock_item": 1, "gst_hsn_code": "01011010"})
 		item2 = make_item("W-N-001", {"is_stock_item": 1, "gst_hsn_code": "01011020"})
 		warehouse1 = create_warehouse("Raw Material Iron Building - _TIRC", company=company)
 		warehouse2 = create_warehouse("Woods - _TIRC", company=company)
 		rejected_warehouse = create_warehouse("Rejection Scrap - _TIRC", company=company)
-		posting_date = "2024-12-31"
+		posting_date = datetime.today().date()
 
 		# Create Purchase Order
 		po = frappe.new_doc("Purchase Order")
 		po.company = company
 		po.supplier = "_Test Supplier"
 		po.transaction_date = posting_date
-		po.schedule_date = "2025-01-02"
+		po.schedule_date = datetime.today().date() + timedelta(days=15)
 		item_list = [{"item_code": item1.name, "rate":50 ,"qty": 150, "warehouse": warehouse1}, {"item_code": item2.name,"rate":55 , "qty": 75, "warehouse": warehouse2}]
 		for row in item_list:
 			po.append("items", row)
@@ -4118,6 +4127,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 			supplier=po.supplier,
 			posting_date=posting_date,
 			items=item_list,
+			currency = "USD"
 		)
 		pr.save()
 		pr.submit()

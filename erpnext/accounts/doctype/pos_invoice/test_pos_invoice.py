@@ -1157,7 +1157,7 @@ class TestPOSInvoice(unittest.TestCase):
 				}
 			).insert()
 		inv_points = create_pos_invoice(rate=10000, do_not_save=1)
-
+		inv_points.save()
 		frappe.db.set_value("Customer","_Test Customer",'loyalty_program','Test Single Loyalty')
 		before_lp_details = get_loyalty_program_details_with_points(
 			"_Test Customer", loyalty_program="Test Single Loyalty"
@@ -1169,13 +1169,12 @@ class TestPOSInvoice(unittest.TestCase):
 		inv.loyalty_amount = inv.loyalty_points * before_lp_details.conversion_factor
 		inv.tax_category = "In-State"
 		inv.taxes_and_charges = "Output GST In-state - _TC"
-
+		inv.save()
 		inv.append(
 			"payments",
-			{"mode_of_payment": "Cash", "account": "Cash - _TC", "amount": 10000 - inv.loyalty_amount},
+			{"mode_of_payment": "Cash", "account": "Cash - _TC", "amount": inv.grand_total - inv.loyalty_amount},
 		)
-		inv.save()
-		inv.paid_amount = 10000 - inv.loyalty_amount
+		inv.paid_amount = inv.grand_total
 		inv.submit()
 		self.assertEqual(inv.status, "Paid")
 		

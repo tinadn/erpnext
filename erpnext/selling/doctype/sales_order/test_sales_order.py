@@ -18,7 +18,6 @@ from erpnext.maintenance.doctype.maintenance_schedule.test_maintenance_schedule 
 from erpnext.maintenance.doctype.maintenance_visit.test_maintenance_visit import (
 	make_maintenance_visit,
 )
-from erpnext.manufacturing.doctype.blanket_order.test_blanket_order import make_blanket_order
 from erpnext.selling.doctype.product_bundle.test_product_bundle import make_product_bundle
 from erpnext.selling.doctype.sales_order.sales_order import (
 	WarehouseRequired,
@@ -1476,7 +1475,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		Second Sales Order should not add on to Blanket Orders Ordered Quantity.
 		"""
 
-		make_blanket_order(blanket_order_type="Selling", quantity=10, rate=10)
+		_make_blanket_order(blanket_order_type="Selling", quantity=10, rate=10)
 
 		so = make_sales_order(item_code="_Test Item", qty=5, against_blanket_order=1)
 		so_doc = frappe.get_doc("Sales Order", so.get("name"))
@@ -2147,7 +2146,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 
 		self.assertEqual(dn.items[0].rate, 90)
 
-	def test_credit_limit_on_so_reopning(self):
+	def test_credit_limit_on_so_reopening(self):
 		# set credit limit
 		company = "_Test Company"
 		customer = frappe.get_doc("Customer", self.customer)
@@ -2169,12 +2168,14 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 
 		so1 = make_sales_order(qty=9, rate=100, do_not_submit=True)
 		so1.customer = self.customer
+		so1.customer_address = so1.shipping_address_name = None
 		so1.save().submit()
 
 		so1.update_status("Closed")
 
 		so2 = make_sales_order(qty=9, rate=100, do_not_submit=True)
 		so2.customer = self.customer
+		so2.customer_address = so2.shipping_address_name = None
 		so2.save().submit()
 
 		self.assertRaises(frappe.ValidationError, so1.update_status, "Draft")
@@ -2278,8 +2279,10 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		self.assertEqual(si.status, "Unpaid", "Sales Invoice not created")
 		self.validate_gl_entries(si.name,25000)
   
+	@if_app_installed("india_compliance")
 	def test_sales_order_with_partial_advance_payment_TC_S_041(self):
 		make_item("_Test Item", {"is_stock_item": 1})
+		get_or_create_fiscal_year("_Test Company")
 		make_stock_entry(item_code="_Test Item", qty=100, rate=500, target="_Test Warehouse - _TC")
 		so = make_sales_order(cost_center='Main - _TC', selling_price_list='Standard Selling', qty=1, rate=5000, do_not_save=True)
 		so.save()
@@ -4026,9 +4029,11 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		si.reload()
 		self.assertEqual(si.outstanding_amount, 0)
 		self.assertEqual(si.status, "Paid")
- 
+	
+	@if_app_installed("india_compliance")
 	def test_sales_order_with_full_advance_payment_and_shipping_rule_TC_S_044(self):
 		make_item("_Test Item", {"is_stock_item": 1})
+		get_or_create_fiscal_year("_Test Company")
 		make_stock_entry(item_code="_Test Item", qty=100, rate=500, target="_Test Warehouse - _TC")
 		so = make_sales_order(
 			cost_center='Main - _TC', 
@@ -4069,8 +4074,10 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': si.name,'account': 'Debtors - _TC'}, 'debit'), 5200)
 		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': si.name,'account': '_Test Account Shipping Charges - _TC'}, 'credit'), 200)
   
+	@if_app_installed("india_compliance")
 	def test_sales_order_with_partial_advance_payment_and_shipping_rule_TC_S_045(self):
 		make_item("_Test Item", {"is_stock_item": 1})
+		get_or_create_fiscal_year
 		make_stock_entry(item_code="_Test Item", qty=100, rate=500, target="_Test Warehouse - _TC")
 		so = make_sales_order(
 			cost_center='Main - _TC', 
@@ -5461,8 +5468,10 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 	def test_so_to_si_with_loyalty_point_creating_payment_TC_S_108(self):
 		from erpnext.accounts.doctype.loyalty_program.loyalty_program import get_loyalty_program_details_with_points
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
-		make_stock_entry(item_code="_Test Item", qty=10, rate=5000, target="_Test Warehouse - _TC")
+		make_item("_Test Item", {"is_stock_item": 1})
 		get_or_create_fiscal_year('_Test Company')
+		make_stock_entry(item_code="_Test Item", qty=10, rate=5000, target="_Test Warehouse - _TC")
+		
 		so = make_sales_order(qty=4,rate=5000)	
 
 		self.assertEqual(so.status, "To Deliver and Bill", "Sales Order not created")
@@ -5823,11 +5832,10 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
  
 	@if_app_installed("sales_commission")
 	def test_so_with_maintenance_visit_TC_S_138(self):
-		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
 		from erpnext.maintenance.doctype.maintenance_visit.test_maintenance_visit import make_sales_person
 		from erpnext.selling.doctype.sales_order.sales_order import make_maintenance_visit
 
-		item=make_test_item("_Test Item 3")
+		item=make_item("_Test Item 3")
 		item.is_stock_item =0
 		item.save()
 		address=frappe.get_doc(
@@ -6617,36 +6625,44 @@ def make_sales_order_workflow():
 	return workflow
 
 def get_or_create_fiscal_year(company):
-	from datetime import datetime
-	current_date = datetime.today()
-	formatted_date = current_date.strftime("%Y-%m-%d")
+	from datetime import datetime, date
+	import frappe
+
+	current_date = datetime.today().date()
 	existing_fy = frappe.get_all(
 		"Fiscal Year",
-		filters={ 
-			"year_start_date": ["<=", formatted_date],
-			"year_end_date": [">=", formatted_date],
-			"disabled": 0
-		},
-		fields=["name"]
+		filters={"disabled": 0},
+		fields=["name", "year_start_date", "year_end_date"]
 	)
+	updated_existing_fy = None
+	
+	for d in existing_fy:
+		start_date = d.year_start_date.date() if isinstance(d.year_start_date, datetime) else d.year_start_date
+		end_date = d.year_end_date.date() if isinstance(d.year_end_date, datetime) else d.year_end_date
+		if start_date <= current_date <= end_date:
+			updated_existing_fy = d.name
+			break
 
-	if existing_fy:
-		fiscal_year = frappe.get_doc("Fiscal Year",existing_fy[0].name)
+	is_company = False
+	if updated_existing_fy:
+		fiscal_year = frappe.get_doc("Fiscal Year", updated_existing_fy)
 		for years in fiscal_year.companies:
 			if years.company == company:
-				pass
-			else:
-				fiscal_year.append("companies", {"company": company})
-				fiscal_year.save()
+				is_company = True
+		if not is_company:
+			fiscal_year.append("companies", {"company": company})
+			fiscal_year.save()
 	else:
 		current_year = datetime.now().year
-		first_date = f"01-01-{current_year}"
-		last_date = f"31-12-{current_year}"
+		first_date = date(current_year, 1, 1)
+		last_date = date(current_year, 12, 31)
 		fiscal_year = frappe.new_doc("Fiscal Year")
-		fiscal_year.year = f"{current_year}"
+		fiscal_year.year = f"{current_year}-{company}"
 		fiscal_year.year_start_date = first_date
 		fiscal_year.year_end_date = last_date
-		fiscal_year.append('companies',{
-			'company':company
-		})
+		fiscal_year.append("companies", {"company": company})
 		fiscal_year.save()
+
+def _make_blanket_order(**args):
+	from erpnext.manufacturing.doctype.blanket_order.test_blanket_order import make_blanket_order
+	return make_blanket_order(**args)
