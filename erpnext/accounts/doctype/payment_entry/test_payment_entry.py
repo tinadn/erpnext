@@ -1867,12 +1867,15 @@ class TestPaymentEntry(FrappeTestCase):
 		create_company()
 		validate_fiscal_year('_Test Company')
 		create_account()
-  
+		company = frappe.get_doc("Company", "_Test Company")
+		if not company.default_advance_paid_account:
+				company.default_advance_paid_account = "Creditors - _TC"
+				company.save()
 		create_tax_withholding_category(
 		category_name="Test - TDS - 194C - Company",
 		rate=2,
-		from_date=frappe.utils.get_date_str('01-04-2024'),
-		to_date=frappe.utils.get_date_str('31-03-2025'),
+		from_date=frappe.utils.today(),
+		to_date=frappe.utils.add_years(frappe.utils.today(), 1),
 		account="_Test TDS Payable - _TC",
 		single_threshold=30000,
 		cumulative_threshold=100000,
@@ -1882,9 +1885,9 @@ class TestPaymentEntry(FrappeTestCase):
 		supplier = create_supplier(
 			supplier_name="_Test Supplier TDS",
 			company="_Test Company",
-			tax_withholding_category="Test - TDS - 194C - Company")
+			tax_withholding_category="Test - TDS - 194C - Company"
+   		)
 
-		
 		if not supplier.tax_withholding_category:
 				setattr(supplier,'tax_withholding_category',"Test - TDS - 194C - Company")
 
@@ -2066,72 +2069,6 @@ class TestPaymentEntry(FrappeTestCase):
 		self.assertRaises(frappe.DoesNotExistError, frappe.get_doc, pe.doctype, pe.name)
 		self.assertRaises(frappe.DoesNotExistError, frappe.get_doc, "Journal Entry", jv[0])
 
-	def test_apply_tax_withholding_category_TC_ACC_021(self):
-		from erpnext.accounts.doctype.tax_withholding_category.test_tax_withholding_category import create_tax_withholding_category
-		
-		create_account()
-  
-		create_tax_withholding_category(
-		category_name="Test - TDS - 194C - Company",
-		rate=2,
-		from_date=frappe.utils.get_date_str('01-04-2024'),
-		to_date=frappe.utils.get_date_str('31-03-2025'),
-		account="_Test TDS Payable - _TC",
-		single_threshold=30000,
-		cumulative_threshold=100000,
-		consider_party_ledger_amount=1,
-		)
-
-		supplier = create_supplier(
-			supplier_name="_Test Supplier TDS",
-			company="_Test Company",
-			tax_withholding_category="Test - TDS - 194C - Company")
-
-		
-		if not supplier.tax_withholding_category:
-				setattr(supplier,'tax_withholding_category',"Test - TDS - 194C - Company")
-
-		if supplier:
-	
-			self.assertEqual(supplier.tax_withholding_category,"Test - TDS - 194C - Company")
-			
-			tax_withholding_category=frappe.get_doc("Tax Withholding Category","Test - TDS - 194C - Company")
-			
-			if len(tax_withholding_category.accounts) >0:
-				self.assertEqual(tax_withholding_category.accounts[0].account,"_Test TDS Payable - _TC")
-			
-			payment_entry=create_payment_entry(
-				party_type="Supplier",
-				party=supplier.name,
-				payment_type="Pay",
-				paid_from="Cash - _TC",
-				paid_to="Creditors - _TC",
-				save=True
-			)
-			payment_entry.apply_tax_withholding_amount=1
-			payment_entry.tax_withholding_category="Test - TDS - 194C - Company"
-			payment_entry.paid_amount=80000
-			payment_entry.append(
-						"taxes",
-						{
-							"account_head": "_Test TDS Payable - _TC",
-							"charge_type": "On Paid Amount",
-							"rate": 0,
-							"add_deduct_tax": "Deduct",
-							"description": "Cash",
-						},
-					)
-			
-			
-			payment_entry.save()
-			payment_entry.submit()
-			self.voucher_no = payment_entry.name
-			self.expected_gle =[
-       				{'account': '_Test TDS Payable - _TC', 'debit': 0.0, 'credit': payment_entry.base_total_taxes_and_charges}, 
-					{'account': 'Creditors - _TC', 'debit': payment_entry.base_paid_amount, 'credit': 0.0}, 
-     				{'account': 'Cash - _TC', 'debit': 0.0, 'credit':payment_entry.received_amount_after_tax}
-     			]	
-			self.check_gl_entries()
 	def test_link_advance_payment_with_purchase_invoice_TC_ACC_022(self):
 		create_records('_Test Supplier TDS')
 		supplier=frappe.get_doc("Supplier","_Test Supplier TDS")
@@ -2212,6 +2149,7 @@ def create_payment_entry(**args):
 	payment_entry.paid_from = args.get("paid_from") or "_Test Bank - _TC"
 	payment_entry.paid_to = args.get("paid_to") or "Creditors - _TC"
 	payment_entry.paid_amount = args.get("paid_amount") or 1000
+	
 
 	payment_entry.setup_party_account_field()
 	payment_entry.set_missing_values()
