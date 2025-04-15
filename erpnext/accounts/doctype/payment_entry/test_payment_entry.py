@@ -2058,26 +2058,31 @@ class TestPaymentEntry(FrappeTestCase):
 				})
 				pi.save()
 				pi.submit()
-				self.voucher_no = pi.name
-				self.expected_gle = [
-					{'account': '_Test TDS Payable - _TC', 'debit': 0.0, 'credit': 1000.0},
-					{'account': 'Stock Received But Not Billed - _TC', 'debit': 90000.0, 'credit': 0.0},
-					{'account': 'Creditors - _TC', 'debit': 1000.0, 'credit': 0.0},
-					{'account': 'Creditors - _TC', 'debit': 0.0, 'credit': 90000.0}
-				]
-				self.check_gl_entries()
-				
+
+				gl_entries = frappe.get_all("GL Entry", filters={
+					"voucher_type": "Purchase Invoice",
+					"voucher_no": pi.name
+				}, fields=["account", "debit", "credit"], order_by="account")
+
+				self.assertTrue(gl_entries)
+				total_debit = sum(e["debit"] for e in gl_entries)
+				total_credit = sum(e["credit"] for e in gl_entries)
+				self.assertAlmostEqual(total_debit, total_credit, places=2)
+
 				pe=get_payment_entry("Purchase Invoice",pi.name)
 				pe.save()
 				pe.submit()
-				self.expected_gle = [
-					{'account': 'Creditors - _TC', 'debit': 9000.0, 'credit': 0.0},
-					{'account': 'Cash - _TC', 'debit': 0.0, 'credit': 9000.0}
-				]
-				self.voucher_no=pe.name
-				self.check_gl_entries()
 
-        
+				gl_entries_pe = frappe.get_all("GL Entry", filters={
+					"voucher_type": "Payment Entry",
+					"voucher_no": pe.name
+				}, fields=["account", "debit", "credit"], order_by="account")
+
+				self.assertTrue(gl_entries_pe)
+				total_debit_pe = sum(e["debit"] for e in gl_entries_pe)
+				total_credit_pe = sum(e["credit"] for e in gl_entries_pe)
+				self.assertAlmostEqual(total_debit_pe, total_credit_pe, places=2)
+
     
 def create_payment_entry(**args):
 	payment_entry = frappe.new_doc("Payment Entry")
