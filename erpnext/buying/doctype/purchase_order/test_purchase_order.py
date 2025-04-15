@@ -3520,6 +3520,63 @@ class TestPurchaseOrder(FrappeTestCase):
 			msg_args, _ = mock_msgprint.call_args
 			self.assertIn("Available Budget Limit Exceeded", msg_args[0])
 
+	def test_update_committed_overall_budget(self):
+		project_name = "test_project"
+		if not frappe.db.exists("Project",{"project_name": project_name}):
+			frappe.get_doc(
+				{
+					"doctype": "Project",
+					"company": "_Test Company",
+					"project_name": project_name,
+					"is_wbs": 1
+				}
+			).insert()
+
+		project = frappe.db.get_value("Project", {"project_name": project_name})
+
+		wbs = frappe.get_doc(
+			{
+				"doctype": "Work Breakdown Structure",
+				"project": project,
+				"wbs_name": "test_wbs",
+				"company": "_Test Company",
+				"gl_account": "Cash - _TC"
+			}
+		)
+		wbs.insert()
+		wbs.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		zero_budget = frappe.get_doc(
+			{
+				"doctype": "Zero Budget",
+				"project": project,
+				"posting_date": today(),
+				"zero_budget_item": [
+					{
+						"wbs_element": wbs.name,
+						"zero_budget": 100
+					}
+				]
+			}
+		)
+		zero_budget.insert()
+		zero_budget.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		args = {
+			"qty":1,
+			"rate": 200,
+			"do_not_submit": True
+		}
+		po = create_purchase_order(**args)
+		po.items[0].work_breakdown_structure = wbs.name
+		po.save()
+		po.submit()
+		self.assertEqual(po.docstatus, 1)
+
 	def test_po_pr_pi_multiple_flow_TC_B_065(self):
 		
 		# Scenario : PO=>2PR=>2PI
