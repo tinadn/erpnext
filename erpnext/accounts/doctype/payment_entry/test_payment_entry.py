@@ -48,7 +48,7 @@ class TestPaymentEntry(FrappeTestCase):
 		so = make_sales_order()
 		pe = get_payment_entry("Sales Order", so.name, bank_account="_Test Cash - _TC")
 		pe.paid_from = "Debtors - _TC"
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -74,7 +74,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe = get_payment_entry("Sales Order", so.name)
 		pe.source_exchange_rate = 55
 		pe.received_amount = 5500
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		# there should be no difference amount
@@ -179,7 +179,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_no = "1"
 		pe.reference_date = "2016-01-01"
 		pe.source_exchange_rate = 50
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -211,7 +211,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_no = "1"
 		pe.reference_date = "2016-01-01"
 		pe.source_exchange_rate = 50
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -239,7 +239,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_no = "1"
 		pe.reference_date = "2016-01-01"
 		pe.source_exchange_rate = 50
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		outstanding_amount, status = frappe.db.get_value(
@@ -473,7 +473,7 @@ class TestPaymentEntry(FrappeTestCase):
 		self.assertEqual(pe.deductions[0].account, "Write Off - _TC")
 		self.assertEqual(pe.difference_amount, 0.0)
 
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -527,7 +527,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.deductions[-1].account = "_Test Exchange Gain/Loss - _TC"
 		pe.deductions[-1].cost_center = "_Test Cost Center - _TC"
 
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		self.assertEqual(pe.difference_amount, 0.0)
@@ -559,7 +559,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_no = "1"
 		pe.reference_date = "2016-01-01"
 		pe.source_exchange_rate = 50
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		outstanding_amount, status = frappe.db.get_value(
@@ -593,7 +593,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.deductions[0].account = "_Test Exchange Gain/Loss - _TC"
 		pe.deductions[0].cost_center = "_Test Cost Center - _TC"
 
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -690,7 +690,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.deductions[0].account = "_Test Exchange Gain/Loss - _TC"
 		pe.deductions[0].cost_center = "_Test Cost Center - _TC"
 
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_gle = dict(
@@ -810,7 +810,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_no = "1"
 		pe.reference_date = "2016-01-01"
 		pe.received_amount = pe.paid_amount = 110
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 
 		self.assertEqual(pe.unallocated_amount, 10)
 
@@ -888,7 +888,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_date = nowdate()
 		pe.paid_to = "_Test Bank - _TC"
 		pe.paid_amount = si.grand_total
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_values = {
@@ -925,7 +925,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_date = nowdate()
 		pe.paid_from = "_Test Bank - _TC"
 		pe.paid_amount = pi.grand_total
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_values = {
@@ -965,7 +965,7 @@ class TestPaymentEntry(FrappeTestCase):
 		pe.reference_date = nowdate()
 		pe.paid_to = "_Test Bank - _TC"
 		pe.paid_amount = si.grand_total
-		pe.insert()
+		pe.insert(ignore_permissions=True)
 		pe.submit()
 
 		expected_account_balance = account_balance + si.grand_total

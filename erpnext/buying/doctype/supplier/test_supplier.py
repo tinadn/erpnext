@@ -175,7 +175,7 @@ def create_supplier(**args):
 	if not args.without_supplier_group:
 		doc.supplier_group = args.supplier_group or "Services"
 
-	doc.insert()
+	doc.insert(ignore_permissions=True)
 
 	return doc
 

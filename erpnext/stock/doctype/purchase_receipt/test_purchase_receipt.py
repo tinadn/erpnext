@@ -1125,7 +1125,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		pi.items[0].pr_detail = pr.items[0].name
 		pi.items[0].purchase_order = po.name
 		pi.items[0].po_detail = po.items[0].name
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 
 		# self.assertEqual(po.payment_terms_template, pi.payment_terms_template)
 		compare_payment_schedules(self, po, pi)
@@ -2348,7 +2348,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		# Create a Purchase Receipt and Fully Bill it
 		pr = make_purchase_receipt(qty=10)
 		pi = make_pi_from_pr(pr.name)
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 		pi.submit()
 
 		# Debit Note - 50% Qty & enable updating PR billed amount
@@ -4558,7 +4558,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 				}
 			]
 		})
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 		self.assertEqual(len(pi.items), 1)
 		self.assertEqual(pi.items[0].rate, item_price)
 		self.assertEqual(pi.net_total, item_price)
@@ -4618,7 +4618,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 
 		pi = make_purchase_invoice(pr.name)
 		pi.bill_no = "test_bill_1122"
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 		pi.submit()
 		self.assertEqual(pi.docstatus, 1)
 
@@ -4734,7 +4734,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		acc.company = "_Test Company"
 		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax IGST","company": "_Test Company" })
 		if not account_name:
-			account_name = acc.insert()
+			account_name = acc.insert(ignore_permissions=True)
 
 		doc_pr = make_purchase_receipt(**pr_data)
 		doc_pr.append("taxes", {
@@ -4748,7 +4748,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(doc_pr.grand_total, 10080)
 
 		pi = make_pi_from_pr(doc_pr.name)
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 		pi.submit()
 
 		self.assertEqual(pi.discount_amount, 1000)
@@ -4786,7 +4786,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		acc.company = "_Test Company"
 		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax IGST","company": "_Test Company" })
 		if not account_name:
-			account_name = acc.insert()
+			account_name = acc.insert(ignore_permissions=True)
 
 		doc_pr = make_purchase_receipt(**pr_data)
 		doc_pr.append("taxes", {
@@ -4800,7 +4800,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(doc_pr.grand_total, 10080)
 
 		pi = make_pi_from_pr(doc_pr.name)
-		pi.insert()
+		pi.insert(ignore_permissions=True)
 		pi.submit()
 
 		self.assertEqual(pi.discount_amount, 1120)
@@ -4835,7 +4835,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		acc.company = "_Test Company"
 		account_name = frappe.db.exists("Account", {"account_name" : "Input Tax IGST","company": "_Test Company" })
 		if not account_name:
-			account_name = acc.insert()
+			account_name = acc.insert(ignore_permissions=True)
 
 		doc_pr = make_purchase_receipt(**pr_data)
 		doc_pr.append("taxes", {

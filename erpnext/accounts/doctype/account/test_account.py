@@ -59,7 +59,7 @@ class TestAccount(unittest.TestCase):
 			acc.parent_account = "Accounts Receivable - _TC"
 			acc.account_number = "1210"
 			acc.company = "_Test Company"
-			acc.insert()
+			acc.insert(ignore_permissions=True)
 
 			account_number, account_name = frappe.db.get_value(
 				"Account", "1210 - Debtors - _TC", ["account_number", "account_name"]
@@ -171,7 +171,7 @@ class TestAccount(unittest.TestCase):
 		acc.account_name = "Test Sync Account"
 		acc.parent_account = "Temporary Accounts - _TC3"
 		acc.company = "_Test Company 3"
-		acc.insert()
+		acc.insert(ignore_permissions=True)
 
 		acc_tc_4 = frappe.db.get_value(
 			"Account", {"account_name": "Test Sync Account", "company": "_Test Company 4"}
@@ -200,7 +200,7 @@ class TestAccount(unittest.TestCase):
 		acc.account_name = "Test Rename Account"
 		acc.parent_account = "Temporary Accounts - _TC3"
 		acc.company = "_Test Company 3"
-		acc.insert()
+		acc.insert(ignore_permissions=True)
 
 		# Rename account in parent company
 		update_account_number(acc.name, "Test Rename Sync Account", "1234")
@@ -251,7 +251,7 @@ class TestAccount(unittest.TestCase):
 		acc = create_bank_account()
 		# Explicitly set currency
 		acc.account_currency = "JPY"
-		acc.insert()
+		acc.insert(ignore_permissions=True)
 		self.assertTrue(
 			frappe.db.exists(
 				{
@@ -268,7 +268,7 @@ class TestAccount(unittest.TestCase):
 
 		acc = create_bank_account()
 		# default currency is used
-		acc.insert()
+		acc.insert(ignore_permissions=True)
 		self.assertTrue(
 			frappe.db.exists(
 				{
@@ -291,7 +291,7 @@ class TestAccount(unittest.TestCase):
 		acc.parent_account = "Temporary Accounts - _TC3"
 		acc.is_group = 1
 		acc.company = "_Test Company 3"
-		acc.insert()
+		acc.insert(ignore_permissions=True)
 
 		self.assertTrue(
 			frappe.db.exists("Account", {"account_name": "Test Group Account", "company": "_Test Company 4"})
@@ -334,7 +334,7 @@ class TestAccount(unittest.TestCase):
 			acc.account_name = "Test Currency Account"
 			acc.parent_account = "Tax Assets - _TC"
 			acc.company = "_Test Company"
-			acc.insert()
+			acc.insert(ignore_permissions=True)
 		else:
 			acc = frappe.get_doc("Account", "Test Currency Account - _TC")
 
@@ -354,7 +354,7 @@ class TestAccount(unittest.TestCase):
 			acc.account_name = "Test Percent Account %5"
 			acc.parent_account = "Tax Assets - _TC"
 			acc.company = "_Test Company"
-			acc.insert()
+			acc.insert(ignore_permissions=True)
 
 		balance = get_balance_on(account="Test Percent Account %5 - _TC", date=nowdate())
 		self.assertEqual(balance, 0)

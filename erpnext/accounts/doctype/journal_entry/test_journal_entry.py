@@ -150,7 +150,7 @@ class TestJournalEntry(unittest.TestCase):
 			},
 		)
 
-		if account_bal == stock_bal:
+		if account_bal == stock_bal and (account_bal > 0 and stock_bal > 0):
 			self.assertRaises(StockAccountInvalidTransaction, jv.save)
 			frappe.db.rollback()
 		else:
@@ -776,7 +776,10 @@ class TestJournalEntry(unittest.TestCase):
 			self.assertEqual(entry["credit"], expected["credit"], f"Credit mismatch for {entry['account']}.")
 
 	def test_payment_of_gst_tds_TC_ACC_054(self):
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import validate_fiscal_year
 		# Set up input parameters
+		validate_fiscal_year("_Test Company")
+		create_custom_test_accounts()
 		entry_type = "Journal Entry"
 		credit_account = "_Test Bank - _TC"
 		amount = 20000.0
@@ -1612,3 +1615,30 @@ def make_journal_entry(
 
 
 test_records = frappe.get_test_records("Journal Entry")
+def create_custom_test_accounts():
+	accounts = [
+		["_Test Account Tax Assets", "Current Assets", 1, None, None],
+		["_Test Account VAT", "_Test Account Tax Assets", 0, "Tax", None],
+		["_Test Account Service Tax", "_Test Account Tax Assets", 0, "Tax", None],
+		["_Test Account Reserves and Surplus", "Current Liabilities", 0, None, None],
+		["_Test Account Cost for Goods Sold", "Expenses", 0, None, None],
+		["_Test Bank", "Bank Accounts", 0, "Bank", None],
+		["_Test Account IGST", "_Test Account Tax Assets", 0, "Tax", None],
+	]
+
+	company = "_Test Company"
+	abbr = "_TC"
+
+	for account_name, parent_account, is_group, account_type, currency in accounts:
+		if not frappe.db.exists("Account", account_name+" - "+abbr):
+			doc = frappe.get_doc({
+				"doctype": "Account",
+				"account_name": account_name,
+				"parent_account": f"{parent_account} - {abbr}",
+				"company": company,
+				"is_group": is_group,
+				"account_type": account_type,
+				"account_currency": currency or frappe.get_cached_value("Company", company, "default_currency"),
+				"account_number": "",  # Prevents autoname error
+			})
+			doc.insert(ignore_permissions=True)

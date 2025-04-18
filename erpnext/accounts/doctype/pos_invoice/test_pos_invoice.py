@@ -1022,9 +1022,11 @@ class TestPOSInvoice(unittest.TestCase):
 		test_user, pos_profile = init_user_and_profile()
 		opening_entry = create_opening_entry(pos_profile=pos_profile, user=test_user.name)
 		self.assertEqual(opening_entry.status, "Open")
-		inv_points = create_pos_invoice(rate=10000, do_not_save=1)
-
 		frappe.db.set_value("Customer","_Test Customer",'loyalty_program','Test Single Loyalty')
+		inv_points = create_pos_invoice(rate=10000, do_not_save=1)
+		inv_points.save()
+		inv_points.paid_amount = inv_points.grand_total
+		inv_points.submit()
 		before_lp_details = get_loyalty_program_details_with_points(
 			"_Test Customer", loyalty_program="Test Single Loyalty"
 		)
@@ -1162,9 +1164,11 @@ class TestPOSInvoice(unittest.TestCase):
 					"collection_rules": [{"tier_name": "Silver", "collection_factor": 1000, "min_spent": 1000}],
 				}
 			).insert()
+		frappe.db.set_value("Customer","_Test Customer",'loyalty_program','Test Single Loyalty')
 		inv_points = create_pos_invoice(rate=10000, do_not_save=1)
 		inv_points.save()
-		frappe.db.set_value("Customer","_Test Customer",'loyalty_program','Test Single Loyalty')
+		inv_points.paid_amount = inv_points.grand_total
+		inv_points.submit()
 		before_lp_details = get_loyalty_program_details_with_points(
 			"_Test Customer", loyalty_program="Test Single Loyalty"
 		)

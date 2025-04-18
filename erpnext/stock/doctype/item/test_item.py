@@ -1279,7 +1279,7 @@ def create_item(
 				item.gst_hsn_code = gst_hsn_code.hsn_code
 			else:
 				item.gst_hsn_code = gst_hsn_code
-		item.save()
+		item.save(ignore_permissions=True)
 	else:
 		item = frappe.get_doc("Item", item_code)
 	return item

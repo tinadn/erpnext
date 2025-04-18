@@ -268,6 +268,7 @@ class TestBlanketOrder(FrappeTestCase):
 			purpose="Material Receipt"
 		)
 		so.delivery_date = add_days(nowdate(), 5)
+		so.currency = "INR"
 		so.submit()
 
 		bo.reload()
@@ -392,7 +393,7 @@ def create_taxes_interstate():
 		acc.company = "_Test Company"
 		account_name_cgst = frappe.db.exists("Account", {"account_name" : "Input Tax CGST","company": "_Test Company" })
 		if not account_name_cgst:
-			account_name_cgst = acc.insert()
+			account_name_cgst = acc.insert(ignore_permissions=True)
 
 		
 		acc = frappe.new_doc("Account")
@@ -401,7 +402,7 @@ def create_taxes_interstate():
 		acc.company = "_Test Company"
 		account_name_sgst = frappe.db.exists("Account", {"account_name" : "Input Tax SGST","company": "_Test Company" })
 		if not account_name_sgst:
-			account_name_sgst = acc.insert()
+			account_name_sgst = acc.insert(ignore_permissions=True)
 		
 		return [
 			{

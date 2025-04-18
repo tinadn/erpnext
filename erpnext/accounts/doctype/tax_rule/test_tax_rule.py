@@ -296,6 +296,8 @@ class TestTaxRule(unittest.TestCase):
 		self.assertTrue(len(quotation.taxes) > 0)
 
 	def test_create_tax_rule_and_apply_to_sales_invoice_TC_ACC_101(self):
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
+		get_or_create_fiscal_year("_Test Company")
 		# Step 1: Create a tax rule for a customer with a sales tax template
 		make_tax_rule(
 			customer="_Test Customer",
@@ -320,6 +322,8 @@ class TestTaxRule(unittest.TestCase):
 	
 	def test_create_tax_rule_and_apply_to_purchase_invoice_TC_ACC_102(self):
 		# Step 1: Create a tax rule for a supplier with a sales tax template
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
+		get_or_create_fiscal_year("_Test Company")
 		if frappe.db.exists("Purchase Taxes and Charges Template", "GST 1 - _TC"):
 			existing_templates = "GST 1 - _TC"
 		else:
