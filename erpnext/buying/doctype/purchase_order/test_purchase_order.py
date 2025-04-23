@@ -3780,30 +3780,63 @@ class TestPurchaseOrder(FrappeTestCase):
 				]
 			}).insert(ignore_permissions=True)
 
+		frappe.db.set_value("Supplier", supplier_name, "prevent_pos", 1)
 		args = {
 			"supplier": supplier_name,
 			"do_not_save": True
 		}
 
-		# Test: Supplier with prevent_pos = 1 should raise ValidationError
 		po = create_purchase_order(**args)
 		with self.assertRaises(ValidationError) as e:
 			po.save()
 
 		self.assertIn("Purchase Orders are not allowed for _Test Supplier", str(e.exception))
 
-		# Update Supplier Scorecard to test warn_pos branch
-		scorecard = frappe.get_doc("Supplier Scorecard", supplier_name)
-		scorecard.standings[0].prevent_pos = 0
-		scorecard.standings[0].warn_pos = 1
-		scorecard.save()
+		frappe.db.set_value("Supplier", supplier_name, "prevent_pos", 0)
+		frappe.db.set_value("Supplier", supplier_name, "warn_pos", 1)
 
-		# Test: Supplier with warn_pos = 1 should not raise error and allow submission
 		po_warn = create_purchase_order(**args)
 		po_warn.save()
 		po_warn.submit()
 
 		self.assertEqual(po_warn.docstatus, 1)
+
+	def test_validate_fg_item_for_subcontracting_code_coverage(self):
+		item = make_test_item("__test_item")
+		item.is_stock_item = 0
+		item.save()
+		args = {
+			"item_code": item.item_code,
+			"do_not_save": True
+		}
+		po = create_purchase_order(**args)
+		po.is_subcontracted = 1
+		with self.assertRaises(frappe.exceptions.ValidationError) as e:
+			po.save()
+
+		self.assertIn("Row #1: Finished Good Item is not specified for service item __test_item", str(e.exception))
+		frappe.db.set_value("Item", "_Test FG Item", "is_sub_contracted_item", 0)
+		po.items[0].fg_item = "_Test FG Item"
+		with self.assertRaises(frappe.exceptions.ValidationError) as e:
+			po.save()
+
+		self.assertIn("Row #1: Finished Good Item _Test FG Item must be a sub-contracted item", str(e.exception))
+
+		frappe.db.set_value("Item", "_Test FG Item", "is_sub_contracted_item", 1)
+		frappe.db.set_value("Item", "_Test FG Item", "default_bom", "")
+
+		po.items[0].fg_item = "_Test FG Item"
+		with self.assertRaises(frappe.exceptions.ValidationError) as e:
+			po.save()
+
+		self.assertIn("Row #1: Default BOM not found for FG Item _Test FG Item", str(e.exception))
+
+		frappe.db.set_value("Item", "_Test FG Item", "default_bom", "BOM-_Test FG Item-001")
+		po.items[0].fg_item_qty = ""
+		with self.assertRaises(frappe.exceptions.ValidationError) as e:
+			po.save()
+
+		self.assertIn("Row #1: Finished Good Item Qty can not be zero", str(e.exception))
 
 	def test_po_pr_pi_multiple_flow_TC_B_065(self):
 		# Scenario : PO=>2PR=>2PI
