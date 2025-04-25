@@ -48,6 +48,7 @@ from erpnext.accounts.doctype.shipping_rule.test_shipping_rule import create_shi
 from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_company_and_supplier as create_data
 from .purchase_order import close_or_unclose_purchase_orders
 
+
 class TestPurchaseOrder(FrappeTestCase):
 	def test_purchase_order_qty(self):
 		po = create_purchase_order(qty=1, do_not_save=True)
