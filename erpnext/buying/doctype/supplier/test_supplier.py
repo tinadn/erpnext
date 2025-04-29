@@ -154,10 +154,8 @@ class TestSupplier(FrappeTestCase):
 		address.delete()
 
 	def setUp(self):
-        # Create a Supplier
 		self.supplier = create_supplier(supplier_name = "Test Supplier for Contact")
 
-        # Create a Contact linked to the Supplier
 		self.contact = frappe.get_doc({
             "doctype": "Contact",
             "first_name": "John",
@@ -171,8 +169,6 @@ class TestSupplier(FrappeTestCase):
 
 	def test_get_supplier_primary_contact(self):
 		from erpnext.buying.doctype.supplier.supplier import get_supplier_primary_contact
-
-		# Simulate a search
 		results = get_supplier_primary_contact(
 		doctype="Contact",
 		txt="John",
@@ -182,7 +178,6 @@ class TestSupplier(FrappeTestCase):
 		filters={"supplier": self.supplier.name}
 		)
 
-		# Validate the result
 		self.assertTrue(results)
 		self.assertIn(self.contact.name, results[0])
 
@@ -217,10 +212,8 @@ class TestSupplier(FrappeTestCase):
 			})
 			supplier.insert(ignore_if_duplicate=True, ignore_permissions=True)
 
-			# Manually call the method
 			supplier.create_primary_address()
 
-			# Reload the supplier to check if values were updated
 			supplier.reload()
 
 			self.assertIsNotNone(supplier.supplier_primary_address)
