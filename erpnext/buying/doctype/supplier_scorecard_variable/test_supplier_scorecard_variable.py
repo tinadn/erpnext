@@ -5,9 +5,12 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from frappe.utils import today, add_days
+
 from erpnext.buying.doctype.supplier_scorecard_variable.supplier_scorecard_variable import (
 	VariablePathNotFound,
 )
+from erpnext.buying.doctype.supplier.test_supplier import create_supplier
 
 from .supplier_scorecard_variable import (
     get_total_workdays,
@@ -75,82 +78,82 @@ class TestSupplierScorecardVariable(FrappeTestCase):
 		self.assertRaises(VariablePathNotFound, create_ssv.save)
 
 	def test_get_total_workdays_codecoverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 
 		get_total = get_total_workdays(get_sscp)
 		self.assertEqual(get_total, 7)
 
 	def test_get_item_workdays_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		get_total = get_item_workdays(get_sscp)
 		self.assertEqual(get_sscp.docstatus, 1)
 
 	def test_get_total_cost_of_shipments_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		get_total_cost = get_total_cost_of_shipments(get_sscp)
 		self.assertEqual(get_sscp.docstatus, 1)
 
 	def test_get_cost_of_delayed_shipments_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		get_cost = get_cost_of_delayed_shipments(get_sscp)
 
 	def test_get_cost_of_on_time_shipments_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		cost_of_on_time = get_cost_of_on_time_shipments(get_sscp)
 
 	def test_get_total_days_late_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		total_days_late = get_total_days_late(get_sscp)
 
 	def test_get_on_time_shipments_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		time_shipments = get_on_time_shipments(get_sscp)
 
 	def test_get_late_shipments_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		late_shipments = get_late_shipments(get_sscp)
 
 	def test_get_total_received_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		total_received = get_total_received(get_sscp)
 
 	def test_get_total_received_amount_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		total_received_amount = get_total_received_amount(get_sscp)
 
 	def test_get_total_received_items_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		total_received = get_total_received_items(get_sscp)
 
 	def test_get_total_rejected_amount_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		total_rejected = get_total_rejected_amount(get_sscp)
 
 	def test_get_total_rejected_items_code_coverage(self):
-		supplier_scorecard = setup_supplier_scorecard("_Test Supplier")
-		get_sscp = frappe.get_doc("Supplier Scorecard Period", {"supplier": "_Test Supplier"})
+		get_sscp = score_card()
+		get_sscp.submit()
 		self.assertEqual(get_sscp.docstatus, 1)
 		get_total_rejected = get_total_rejected_items(get_sscp)
 		get_total_accepted_amount(get_sscp)
@@ -163,18 +166,40 @@ class TestSupplierScorecardVariable(FrappeTestCase):
 		get_sq_total_items(get_sscp)
 		get_rfq_response_days(get_sscp)
 
+def score_card():
+	supplier = create_supplier(supplier_name="__test_supplier" + frappe.generate_hash(length=5))
+	ssc = setup_supplier_scorecard(supplier.name)
+	sscp = frappe.get_doc(
+		{
+			"doctype": "Supplier Scorecard Period",
+			"supplier": supplier.name,
+			"total_score": 5,
+			"start_date": today(),
+			"end_date": add_days(today(), 7),
+			"scorecard": supplier.name,
+			"criteria": [
+				{
+					"criteria_name": ssc.get("criteria_name"),
+					"weight": 100,
+					"formula": "10"
+				}
+			]
+		}
+	)
+	sscp.insert(ignore_permissions=True)
 
+	return sscp
 
 def setup_supplier_scorecard(supplier_name):
 
 	criteria_name = frappe.get_doc(
 		{
 			"doctype": "Supplier Scorecard Criteria",
-			"criteria_name": "test supplier cretiria",
+			"criteria_name": "test supplier cretiria" + frappe.generate_hash(length=4),
 			"max_score": 100,
 			"formula": "10",
 		}
-	).insert(ignore_permissions=True)
+	).insert(ignore_permissions=True, ignore_if_duplicate=True).name
 
 	if not frappe.db.exists("Supplier Scorecard", supplier_name):
 		supplier_scorecard = frappe.get_doc({
@@ -191,14 +216,15 @@ def setup_supplier_scorecard(supplier_name):
 			],
 			"criteria": [
 				{
-					"criteria_name": criteria_name.name,
+					"criteria_name": criteria_name,
 					"weight": 100
 				}
 			]
 		}).insert(ignore_permissions=True)
 
 	return {
-		"supplier_scorecard": supplier_scorecard
+		"supplier_scorecard": frappe.db.get_value("Supplier Scorecard", {"supplier": supplier_name}),
+		"criteria_name": criteria_name
 	}
 
 
