@@ -256,6 +256,35 @@ class TestSupplier(FrappeTestCase):
 
 		self.assertFalse(frappe.db.exists("Supplier", supplier.name))
 
+	def test__add_supplier_role(self):
+		from frappe.utils import random_string
+
+		user_email = f"test_supplier_{random_string(5)}@example.com"
+		user = frappe.new_doc("User")
+		user.email = user_email
+		user.first_name = "Test"
+		user.send_welcome_email = 0
+		user.save(ignore_permissions=True)
+
+		user.set("roles", [])
+		user.save(ignore_permissions=True)
+
+		class DummyPortalUser:
+			def __init__(self, user):
+				self.user = user
+			def is_new(self):
+				return True
+
+		portal_user = DummyPortalUser(user.name)
+
+		supplier = frappe.new_doc("Supplier")
+		supplier._add_supplier_role(portal_user)
+
+		user.reload()
+		roles = [r.role for r in user.roles]
+		self.assertIn("Supplier", roles)
+
+
 def create_supplier(**args):
 	args = frappe._dict(args)
 
