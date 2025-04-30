@@ -10,7 +10,7 @@ import json
 from frappe.tests.utils import FrappeTestCase, change_settings, if_app_installed
 from frappe.utils import flt, today, add_days, nowdate, getdate
 from datetime import date
-from erpnext.stock.doctype.material_request.material_request import make_purchase_order_based_on_supplier
+from erpnext.stock.doctype.material_request.material_request import make_purchase_order_based_on_supplier,get_material_requests_based_on_supplier
 from erpnext.stock.doctype.item.test_item import create_item
 from erpnext.stock.doctype.material_request.material_request import (
 	make_in_transit_stock_entry,
@@ -7472,6 +7472,216 @@ class TestMaterialRequest(FrappeTestCase):
 			self.assertEqual(sh_gle[0], sh_gle[1])
 			self.assertEqual(cogs_gle[0], cogs_gle[1])
 			self.assertEqual(current_bin_qty, bin_qty)
+	
+	def test_check_modified_date_con_fail_tc_pk_001(self):
+		mr = frappe.copy_doc(test_records[0]).insert()
+		mr = frappe.get_doc("Material Request", mr.name)
+		mr.submit()
+		new_modified = frappe.utils.add_days(mr.modified, 1)
+		frappe.db.set_value("Material Request", mr.name, "modified", new_modified)
+		frappe.db.commit()
+		with self.assertRaises(frappe.ValidationError) as ctx:
+			mr.check_modified_date()
+		self.assertIn("has been modified. Please refresh.", str(ctx.exception))
+	
+	def test_get_material_requests_based_on_supplier_tc_pk_002(self):
+		frappe.set_user("Administrator")
+
+		# Create supplier and item
+		supplier = create_supplier(supplier_name="_Test Supplier")
+		item = create_item(item_code="_Test Item", stock_uom="Nos")
+		stock_uom="Nos",
+		warehouse="_Test Warehouse - _TC",
+		company="_Test Company",
+		item.item_defaults = []
+		item.append(
+			"item_defaults",
+			{
+				"default_warehouse": warehouse,
+				"company": company,
+				"default_supplier": "_Test Supplier"
+			},
+		)
+		item.save()
+		item = frappe.get_doc("Item", item.name)
+		
+		#Create MR
+		mr = make_material_request(
+			company="_Test Company",
+			purpose="Purchase",
+			item_code=item.item_code,
+			warehouse=create_warehouse("Stores - _Test", company="_Test Company"),
+			qty=1,
+			rate=100,
+			schedule_date=add_days(nowdate(), 5)
+		)
+		mr.submit()
+
+		#(should throw)
+		with self.assertRaises(frappe.ValidationError) as e:
+			get_material_requests_based_on_supplier(
+				doctype="Material Request",
+				txt="",
+				searchfield="name",
+				start=0,
+				page_len=20,
+				filters={
+					"supplier": "Dummy Supplier Not Linked",
+					"company": "_Test Company"
+				}
+			)
+		self.assertIn("is not the default supplier for any items", str(e.exception))
+
+		results = get_material_requests_based_on_supplier(
+			doctype="Material Request",
+			txt=mr.name,
+			searchfield="name",
+			start=0,
+			page_len=10,
+			filters={
+				"supplier": supplier.name,
+				"company": "_Test Company",
+			}
+		)
+		if not results:
+			frappe.throw("No results found")
+
+		self.assertTrue(results)
+		self.assertEqual(results[0]["name"], mr.name)
+		self.assertEqual(results[0]["company"], "_Test Company")
+		self.assertEqual(results[0]["item_code"], item.item_code)
+
+	def test_validate_qty_against_so_tc_pk_003 (self):
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_customer
+		# Create a test customer
+		if not frappe.db.exists("Customer", "_Test Customer"):
+			create_customer("_Test Customer",currency="INR")
+		item = create_item("CUST-0987", is_customer_provided_item=1, customer="_Test Customer", is_purchase_item=0)
+		missing_item = create_item("CUST-0988", is_customer_provided_item=1, customer="_Test Customer", is_purchase_item=0)
+
+		so = frappe.get_doc({
+			"doctype": "Sales Order",
+			"customer": "_Test Customer",
+			"transaction_date": nowdate(),
+			"delivery_date": add_days(nowdate(), 10),
+			"company": "_Test Company",
+			"items": [{
+				"item_code": item.item_code,
+				"qty": 10,
+				"rate": 100,
+				'warehouse': create_warehouse(
+							warehouse_name="_Test Source Warehouse",
+							properties={"parent_warehouse": "All Warehouses - _TC"},
+							company="_Test Company",
+						)
+					}]}).insert()
+		so.submit()
+
+		mr = frappe.get_doc({
+			"doctype": "Material Request",
+			"material_request_type": "Purchase",
+			"schedule_date": add_days(nowdate(), 5),
+			"company": "_Test Company",
+			"items": [{
+				"item_code": item.item_code, # same item
+				"qty": 5,
+				"schedule_date": add_days(nowdate(), 5),
+				"sales_order": so.name,
+				"warehouse": create_warehouse("Stores - Test", company="_Test Company")
+			},
+			{
+			"item_code": missing_item.item_code,  
+			"qty": 3,
+			"schedule_date": add_days(nowdate(), 5),
+			"sales_order": so.name,
+			"warehouse": create_warehouse("Stores - Test", company="_Test Company")
+		},
+			{
+			"item_code": item.item_code,  # same item
+			"qty": 10,
+			"schedule_date": add_days(nowdate(), 5),
+			"sales_order": so.name,
+			"warehouse": create_warehouse("Stores - Test", company="_Test Company")
+		}]}).insert()
+		mr.submit()
+
+		with self.assertRaises(frappe.ValidationError) as context:
+			mr.validate_qty_against_so()
+
+		self.assertIn("Material Request of maximum", str(context.exception))
+
+	def test_update_requested_qty_in_production_plan_tc_pk_004(self):
+		frappe.set_user("Administrator")
+		 # Create or Get Item
+
+		item = frappe.get_all("Item", limit=1)[0].name
+
+		raw_material_item = frappe.get_all("Item", filters={"is_stock_item": 1}, limit=1, fields=["name"]) 
+		if not raw_material_item:
+			raw_material_item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "Test Raw Material",
+				"item_name": "Test Raw Material",
+				"is_stock_item": 1,
+				"stock_uom": "Nos"
+			}).insert()
+		else:
+			raw_material_item = raw_material_item[0]
+		
+		bom = frappe.db.get_value("BOM", {"item": item, "is_active": 1, "is_default": 1}) # Create or Get BOM
+		if not bom:
+			bom = frappe.get_doc({
+				"doctype": "BOM",
+				"item": item,
+				"is_active": 1,
+				"is_default": 1,
+				"quantity": 1,
+				"items": [{
+					"item_code": raw_material_item.name,
+					"qty": 1,
+					"rate": 100
+				}]
+			}).insert().name
+
+		production_plan = frappe.get_doc({ #Create Production Plan with po_items (this creates internal link)
+			"doctype": "Production Plan",
+			"company": frappe.defaults.get_user_default("Company"),
+			"from_date": frappe.utils.nowdate(),
+			"to_date": frappe.utils.add_days(frappe.utils.nowdate(), 10),
+			"po_items": [{
+				"item_code": item,
+				"bom_no": bom,
+				"planned_qty": 10,
+				"warehouse": frappe.get_all("Warehouse", limit=1)[0].name
+			}]
+		}).insert()
+
+		material_request_plan_item_name = production_plan.po_items[0].name
+		material_request = frappe.get_doc({   #Create a Material Request linked to above Plan and Plan Item
+			"doctype": "Material Request",
+			"material_request_type": "Purchase",
+			"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 5),
+			"company": frappe.defaults.get_user_default("Company"),
+			"items": [{
+				"item_code": item,
+				"qty": 10,
+				"schedule_date": frappe.utils.add_days(frappe.utils.nowdate(), 5),
+				"warehouse": frappe.get_all("Warehouse", limit=1)[0].name,
+				"production_plan": production_plan.name,
+				"material_request_plan_item": material_request_plan_item_name
+			}]
+		}).insert()
+		material_request.submit()
+		material_request.update_requested_qty_in_production_plan()
+
+		updated_plan_item = None
+		for po_item in production_plan.po_items:
+			if po_item.name == material_request_plan_item_name:
+				updated_plan_item = po_item
+				break
+
+		self.assertIsNotNone(updated_plan_item, "Material Request Plan Item not found inside Production Plan")
+		self.assertEqual(updated_plan_item.planned_qty, 10)
 
 def get_in_transit_warehouse(company):
 	if not frappe.db.exists("Warehouse Type", "Transit"):
