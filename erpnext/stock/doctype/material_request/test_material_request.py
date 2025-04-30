@@ -7894,6 +7894,17 @@ def create_fiscal_year(company=None):
 		company = "_Test Company MR"
 
 	today = date.today()
+ 
+	existing_fy = frappe.get_all(
+		"Fiscal Year",
+		fields=["year_start_date", "year_end_date"],
+		filters={"company": company}
+	)
+
+	for fy in existing_fy:
+		if fy.year_start_date <= today <= fy.year_end_date:
+			return
+
 	if today.month >= 4:  # Fiscal year starts in April
 		start_date = date(today.year, 4, 1)
 		end_date = date(today.year + 1, 3, 31)

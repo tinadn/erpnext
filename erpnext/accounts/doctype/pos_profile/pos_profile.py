@@ -27,6 +27,7 @@ class POSProfile(Document):
 
 		account_for_change_amount: DF.Link | None
 		allow_discount_change: DF.Check
+		allow_partial_payment: DF.Check
 		allow_rate_change: DF.Check
 		applicable_for_users: DF.Table[POSProfileUser]
 		apply_discount_on: DF.Literal["Grand Total", "Net Total"]

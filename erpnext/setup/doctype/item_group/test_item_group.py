@@ -97,8 +97,8 @@ class TestItem(unittest.TestCase):
 		# before move
 		old_lft, old_rgt = frappe.db.get_value("Item Group", "_Test Item Group C", ["lft", "rgt"])
 
-		# put B under C
-		group_b = frappe.get_doc("Item Group", "_Test Item Group B")
+		# put sequential item group under C
+		group_b = frappe.get_doc("Item Group", "_Test Item Group Tax Child Override")
 		lft, rgt = group_b.lft, group_b.rgt
 
 		group_b.parent_item_group = "_Test Item Group C"
