@@ -5,5 +5,24 @@
 from frappe.tests.utils import FrappeTestCase
 
 
+class DummyFile:
+    def __init__(self, file_name):
+        self.file_name = file_name
+
 class TestRemittanceofTDScertificate(FrappeTestCase):
-	pass
+	def test_get_pan_list(self):
+		files = [
+			DummyFile("ABCDE1234F_pan.pdf"),
+			DummyFile("XYZ9876543_other.pdf"),
+			DummyFile("invalid_file.txt")
+		]
+
+		from erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate import get_pan_list
+		result = get_pan_list(files)
+
+		expected = [
+			{"file_name": "ABCDE1234F_pan.pdf", "pan": "ABCDE1234F"},
+			{"file_name": "XYZ9876543_other.pdf", "pan": "XYZ9876543"}
+		]
+
+		self.assertEqual(result, expected)
