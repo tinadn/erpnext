@@ -446,6 +446,7 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Test Item",
 				"qty": 1,
+				"allow_zero_valuation_rate":1,
 				"warehouse": warehouse
 			}]
 		}).insert(ignore_permissions=True)
@@ -508,6 +509,7 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Test Item",
 				"qty": 1,
+				"allow_zero_valuation_rate":1,
 				"warehouse": warehouse
 			}]
 		}).insert(ignore_permissions=True)
@@ -526,6 +528,7 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Test Item",
 				"qty": -1,
+				"allow_zero_valuation_rate":1,
 				"warehouse": warehouse
 			}]
 		}).insert(ignore_permissions=True)
@@ -570,6 +573,7 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Book",
 				"qty": 1,
+				"allow_zero_valuation_rate":1,
 				"warehouse": warehouse
 			}]
 		}).insert(ignore_permissions=True)
@@ -627,13 +631,29 @@ class TestDeliveryNote(FrappeTestCase):
 				"doctype": "Item",
 				"item_code": "Book",
 				"item_name": "Book",
-				"item_group":"Products",
-				"stock_uom": "Nos",
 				"item_group": "Products",
+				"stock_uom": "Nos",
 				"is_stock_item": 1,
 				"gst_hsn_code": "01011010"
 			}).insert(ignore_permissions=True)
 
+		# Create Sales Order
+		so = frappe.get_doc({
+			"doctype": "Sales Order",
+			"customer": customer.name,
+			"company": company,
+			"transaction_date": frappe.utils.nowdate(),
+			"delivery_date": frappe.utils.nowdate(),
+			"items": [{
+				"item_code": "Book",
+				"qty": 1,
+				"schedule_date": frappe.utils.nowdate(),
+				"warehouse": warehouse
+			}]
+		}).insert(ignore_permissions=True)
+		so.submit()
+
+		# Create Delivery Note linked to Sales Order
 		dn = frappe.get_doc({
 			"doctype": "Delivery Note",
 			"customer": customer.name,
@@ -643,11 +663,15 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Book",
 				"qty": 1,
-				"warehouse": warehouse
+				"allow_zero_valuation_rate": 1,
+				"warehouse": warehouse,
+				"against_sales_order": so.name,
+				"so_detail": so.items[0].name  # <-- This line fixes the error
 			}]
 		}).insert(ignore_permissions=True)
 
-		deliver_note_status = update_delivery_note_status(dn.name,dn.status)
+		deliver_note_status = update_delivery_note_status(dn.name, dn.status)
+
 
 	def test_make_shipment(self):
 		from erpnext.stock.doctype.delivery_note.delivery_note import make_shipment
@@ -705,6 +729,7 @@ class TestDeliveryNote(FrappeTestCase):
 			"items": [{
 				"item_code": "Book",
 				"qty": 1,
+				"allow_zero_valuation_rate":1,
 				"warehouse": warehouse
 			}]
 		}).insert(ignore_permissions=True)
