@@ -1,8 +1,9 @@
 # Copyright (c) 2024, Frappe Technologies Pvt. Ltd. and Contributors
 # See license.txt
 
-# import frappe
+import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils.file_manager import save_file
 
 
 class DummyFile:
@@ -26,3 +27,25 @@ class TestRemittanceofTDScertificate(FrappeTestCase):
 		]
 
 		self.assertEqual(result, expected)
+            
+	def setUp(self):
+		content = b"Dummy content"
+		self.test_file = save_file(
+			fname="test_attachment.txt",
+			content=content,
+			dt="User",
+			dn=frappe.session.user,
+			folder=None,
+			decode=False
+		)
+		self.test_item = {"file_name": self.test_file.file_name}
+
+	def test_create_attachment(self):
+		from erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate import create_attachment 
+		result = create_attachment(self.test_item)
+
+		self.assertIn("fname", result)
+		self.assertIn("fcontent", result)
+		self.assertEqual(result["fname"], "test_attachment.txt")
+		self.assertEqual(result["fcontent"], b"Dummy content")
+
