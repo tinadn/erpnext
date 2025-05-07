@@ -214,9 +214,9 @@ class TestRequestforQuotation(FrappeTestCase):
 		self.assertIn("testrfquser@example.com", preview)
 
 	def test_get_supplier_tag(self):
-	        from erpnext.buying.doctype.request_for_quotation.request_for_quotation import get_supplier_tag
-			tags = get_supplier_tag()
-	        self.assertIsInstance(tags, list)
+		from erpnext.buying.doctype.request_for_quotation.request_for_quotation import get_supplier_tag
+		tags = get_supplier_tag()
+		self.assertIsInstance(tags, list)
 
 def make_request_for_quotation(**args) -> "RequestforQuotation":
 	"""
