@@ -190,6 +190,29 @@ class TestRequestforQuotation(FrappeTestCase):
 		print('rfq_name', self.rfq.name)
 		self.assertGreaterEqual(len(communications), 1)
 
+	def test_get_supplier_email_preview(self):
+		item_code = "_Test Item"
+		if not frappe.db.exists("Item", item_code):
+			item = make_item(item_code, {"stock_uom": "Nos"})
+		supplier_doc = frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": "Test Supplier for RFQ",
+				"supplier_group": "_Test Supplier Group",
+			}
+		).insert()
+		rfq = make_request_for_quotation(item_code = item_code, supplier_data=[
+				{
+					"supplier": supplier_doc.name,
+					"supplier_name": supplier_doc.supplier_name,
+					"email_id": "testrfquser@example.com",
+				}
+			])
+		preview = rfq.get_supplier_email_preview(supplier_doc.name)
+        
+		self.assertIn("Dear", preview)
+		self.assertIn("testrfquser@example.com", preview)
+
 def make_request_for_quotation(**args) -> "RequestforQuotation":
 	"""
 	:param supplier_data: List containing supplier data
