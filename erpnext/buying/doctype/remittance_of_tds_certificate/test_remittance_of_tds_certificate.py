@@ -7,8 +7,8 @@ from frappe.utils.file_manager import save_file
 
 
 class DummyFile:
-    def __init__(self, file_name):
-        self.file_name = file_name
+	def __init__(self, file_name):
+		self.file_name = file_name
 
 class TestRemittanceofTDScertificate(FrappeTestCase):
 	def test_get_pan_list(self):
@@ -28,7 +28,7 @@ class TestRemittanceofTDScertificate(FrappeTestCase):
 		]
 
 		self.assertEqual(result, expected)
-            
+
 	def setUp(self):
 		content = b"Dummy content"
 		self.test_file = save_file(
@@ -41,16 +41,17 @@ class TestRemittanceofTDScertificate(FrappeTestCase):
 		)
 		self.test_item = {"file_name": self.test_file.file_name}
 		self.supplier_with_email = frappe.get_doc({
-            "doctype": "Supplier",
-            "supplier_name": "Test Supplier Email",
-            "pan": "ABCDE1234F",
-            "email_id": "test@supplier.com"
-        }).insert()
+			"doctype": "Supplier",
+			"supplier_name": "Test Supplier Email",
+			"pan": "ABCDE1234F",
+			"email_id": "test@supplier.com"
+		}).insert()
 
 		self.supplier_without_email = frappe.get_doc({
-            "doctype": "Supplier",
-            "supplier_name": "Test Supplier No Email",
-            "pan": "XYZ9876543"
+			"doctype": "Supplier",
+			"supplier_name": "Test Supplier No Email",
+			"pan": "XYZ9876543"
+		})
 
 	def test_create_attachment(self):
 		from erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate import create_attachment 
@@ -81,4 +82,3 @@ class TestRemittanceofTDScertificate(FrappeTestCase):
 
 		self.assertEqual(len(unrecorded), 1)
 		self.assertEqual(unrecorded[0]['pan'], "XYZ98765431155")
-
