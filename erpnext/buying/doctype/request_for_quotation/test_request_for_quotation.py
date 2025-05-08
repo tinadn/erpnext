@@ -238,6 +238,41 @@ class TestRequestforQuotation(FrappeTestCase):
 		self.assertEqual(context["title"], "Request for Quotation")
 		self.assertTrue(context["show_sidebar"])
 		self.assertTrue(context["no_breadcrumbs"])
+
+	def test_supplier_rfq_mail(self):
+		item_code = "_Test Item"
+		if not frappe.db.exists("Item", item_code):
+			item = make_item(item_code, {"stock_uom": "Nos"})
+		supplier_doc = frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": "Test Supplier1",
+			}
+		).insert()
+		rfq = make_request_for_quotation(item_code = item_code, supplier_data=[
+				{
+					"supplier": supplier_doc.name,
+					"supplier_name": supplier_doc.supplier_name,
+					"email_id": "testrfquser@example.com",
+				}
+			], do_not_submit=True)
+		rfq.email_template = "Dispatch Notification"
+
+		data = {
+			"supplier": "Test Supplier",
+			"supplier_name": "Test Supplier1",
+			"contact": None
+		}
+
+		update_password_link = "http://example.com/set-password"
+		rfq_link = "http://example.com/submit-quotation"
+
+		preview = rfq.supplier_rfq_mail(data, update_password_link, rfq_link, preview=True)
+		print('preview', rfq.name, rfq.email_template)
+
+		self.assertIn("Test Supplier1", preview["message"])
+		self.assertIn("Set Password", preview["message"])
+		self.assertIn("Test Supplier Name", preview["subject"])
 		
 
 def make_request_for_quotation(**args) -> "RequestforQuotation":
