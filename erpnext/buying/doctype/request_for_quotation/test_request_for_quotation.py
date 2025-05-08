@@ -231,6 +231,15 @@ class TestRequestforQuotation(FrappeTestCase):
 
 		self.assertTrue(any(r["name"] == self.rfq.name for r in rfqs))
 
+	def test_get_list_context_coverage(self):
+		from erpnext.buying.doctype.request_for_quotation.request_for_quotation import get_list_context
+
+		context = get_list_context()
+		self.assertEqual(context["title"], "Request for Quotation")
+		self.assertTrue(context["show_sidebar"])
+		self.assertTrue(context["no_breadcrumbs"])
+		
+
 def make_request_for_quotation(**args) -> "RequestforQuotation":
 	"""
 	:param supplier_data: List containing supplier data
