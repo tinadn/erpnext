@@ -50,13 +50,19 @@ class TestSupplierScorecardPeriod(unittest.TestCase):
 				{"criteria_name": supplier_scorecard_criteria.name, "weight": 100},
 			]
 		})
-		# Should pass without error
-		doc.validate_criteria_weights()
+		doc = frappe.get_doc({
+			"doctype": "Supplier Scorecard Period",
+			"scorecard": supplier_scorecard.name,
+			"from_date": "2024-01-01",
+			"to_date": "2024-12-31",
+			"criteria": [
+				{"criteria_name": supplier_scorecard_criteria.name, "weight": 70},
+			]
+		})
 
-		# Modify to invalid weights
-		doc.criteria[0].weight = 70
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaises(frappe.ValidationError) as context:
 			doc.validate_criteria_weights()
+		self.assertIn("Criteria weights must add up to 100%", str(context.exception))
 
 	def test_calculate_variables(self):
 		supplier_scorecard_criteria = frappe.get_doc(
