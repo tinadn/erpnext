@@ -2568,7 +2568,7 @@ class QueryPaymentLedger:
                 .limit(self.limit)
                 .run(debug=1)
             )
-            frappe.log_error("outstanding_vouchers d",outstanding_vouchers)
+            # frappe.log_error("outstanding_vouchers d",outstanding_vouchers)
             if outstanding_vouchers:
                 filter_on_voucher_no.append(
                     ple.voucher_no.isin([x[0] for x in outstanding_vouchers])
@@ -2643,7 +2643,7 @@ class QueryPaymentLedger:
             )
         )
 
-        frappe.log_error("query_voucher_amount",query_voucher_amount)
+        # frappe.log_error("query_voucher_amount",query_voucher_amount)
 
 
         # Query for voucher outstanding
@@ -2691,7 +2691,7 @@ class QueryPaymentLedger:
             )
         )
 
-        frappe.log_error("query_voucher_outstanding",query_voucher_outstanding)
+        # frappe.log_error("query_voucher_outstanding",query_voucher_outstanding)
 
         # Combine voucher amount and outstanding using a CTE
         self.cte_query_voucher_amount_and_outstanding = (
@@ -2789,7 +2789,7 @@ class QueryPaymentLedger:
         self.voucher_outstandings = self.cte_query_voucher_amount_and_outstanding.run(
             as_dict=True,debug=1
         )
-        frappe.log_error("voucher_outstandings", self.voucher_outstandings)
+        # frappe.log_error("voucher_outstandings", self.voucher_outstandings)
 
     def get_voucher_outstandings(
         self,
