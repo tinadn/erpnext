@@ -612,8 +612,6 @@ def make_reverse_gl_entries(
 		is_opening = any(d.get("is_opening") == "Yes" for d in gl_entries)
 		validate_against_pcv(is_opening, gl_entries[0]["posting_date"], gl_entries[0]["company"])
 		if partial_cancel:
-			# Partial cancel is only used by `Advance` in separate account feature.
-			# Only cancel GL entries for unlinked reference using `voucher_detail_no`
 			gle = frappe.qb.DocType("GL Entry")
 			for x in gl_entries:
 				query = (
