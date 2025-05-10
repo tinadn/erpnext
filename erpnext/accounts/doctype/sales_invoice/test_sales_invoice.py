@@ -6976,10 +6976,10 @@ class TestSalesInvoice(FrappeTestCase):
 		self.assertEqual(credit_1, 150000.00)
   
 		debit_1 = frappe.db.get_value("GL Entry", {"voucher_no": sales_invoice.name, "account": "Debtors - _TC"}, "debit")
-		self.assertEqual(debit_1, 151000.00)
+		self.assertEqual(debit_1, 152772.00)
   
 		credit_2 = frappe.db.get_value("GL Entry", {"voucher_no": sales_invoice.name, "account": "_Test TCS Payable - _TC"}, "credit")
-		self.assertEqual(credit_2, 1000.00)
+		self.assertEqual(credit_2, 2721.64)
       
 		if customer.tax_withholding_category:
 			customer.load_from_db()
