@@ -573,6 +573,7 @@ class SellingController(StockController):
 				):
 					sl_entries.append(self.get_sle_for_source_warehouse(d))
 
+
 				if d.target_warehouse:
 					sl_entries.append(self.get_sle_for_target_warehouse(d))
 
