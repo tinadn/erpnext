@@ -554,13 +554,14 @@ class SellingController(StockController):
 
 	def update_stock_ledger(self, allow_negative_stock=False):
 		sl_entries = []
-		finished_item_row = self.get_finished_item_row()
+		if self.doctype != "Sales Invoice":
+			finished_item_row = self.get_finished_item_row()
 
-		# make sl entries for source warehouse first
-		self.get_sle_for_source_warehouse(sl_entries, finished_item_row)
+			# make sl entries for source warehouse first
+			self.get_sle_for_source_warehouse(sl_entries, finished_item_row)
 
-		# SLE for target warehouse
-		self.get_sle_for_target_warehouse(sl_entries, finished_item_row)
+			# SLE for target warehouse
+			self.get_sle_for_target_warehouse(sl_entries, finished_item_row)
 
 		# reverse sl entries if cancel
 		if self.docstatus == 2:
