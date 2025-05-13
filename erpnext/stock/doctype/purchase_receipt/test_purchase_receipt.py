@@ -5324,42 +5324,29 @@ class TestPurchaseReceipt(FrappeTestCase):
 		self.assertEqual(warehouse, expected_warehouse)
 
 	def test_make_item_gl_entries_04(self):
-		from frappe.utils import nowdate, add_days
 		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import PurchaseReceipt
 		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
+		from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
 
 		frappe.set_user("Administrator")
 
 		# === Setup ===
 		company = setup_test_company_defaults()
 
-		# company = frappe.get_doc("Company", "_Test Company")
-		# company.enable_perpetual_inventory = 1
-		# company.enable_provisional_accounting_for_non_stock_items = 1
-		# company.default_provisional_account = "Cost of Goods Sold - _TC"
-		# company.save()
-
 		self.gl_entries = []
 		item = frappe.get_doc("Item", "_Test Item")
 		warehouse = frappe.get_all("Warehouse", filters={"company": "_Test Company"}, limit=1)[0].name
 
 		# === CASE 1: Full Stock Item ===
-		pi = frappe.get_doc({
-			"doctype": "Purchase Invoice",
-			"supplier": "_Test Supplier",
-			"company": company.name,
-			"posting_date": nowdate(),
-			"due_date": add_days(nowdate(), 10),
-			"items": [{
-				"item_code": item.item_code,
-				"qty": 5,
-				"rate": 100,
-				"uom": "Nos",
-				"conversion_factor": 1.0,
-				"warehouse": warehouse
-			}]
-		}).insert()
-		pi.submit()
+		pi = make_purchase_invoice(
+				item=item.item_code,
+				qty=5,
+				rate=100,
+				warehouse=warehouse,
+				company=company.name,
+				supplier="_Test Supplier",
+				do_not_submit=False
+			)
 
 		pr1 = make_purchase_receipt(
 			item_code=item.name,
@@ -5438,7 +5425,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 	def test_get_billed_qty_against_purchase_receipt_05(self):
 		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import get_billed_qty_against_purchase_receipt
 		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
-		from frappe.utils import today
+		from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
 
 		frappe.set_user("Administrator")
 
@@ -5447,27 +5434,21 @@ class TestPurchaseReceipt(FrappeTestCase):
 		pr_doc = frappe.get_doc("Purchase Receipt", pr.name)
 		pr_item = pr_doc.items[0]
 
-		# Create Purchase Invoice manually and link to PR Item via pr_detail
-		pi = frappe.get_doc({
-			"doctype": "Purchase Invoice",
-			"supplier": pr_doc.supplier,
-			"company": pr_doc.company,
-			"posting_date": today(),
-			"items": [{
-				"item_code": pr_item.item_code,
-				"qty": 3,
-				"rate": 100,
-				"purchase_receipt": pr_doc.name,
-				"pr_detail": pr_item.name,
-				"uom": pr_item.uom,
-				"conversion_factor": pr_item.conversion_factor,
-				"warehouse": pr_item.warehouse
-			}]
-		})
-		pi.insert()
+		# Create PI
+		pi = make_purchase_invoice(
+		item_code=pr_item.item_code,
+		qty=3,
+		rate=100,
+		warehouse=pr_item.warehouse,
+		do_not_submit=True
+		)
+		# Link invoice item to Purchase Receipt
+		pi.items[0].purchase_receipt = pr_doc.name
+		pi.items[0].pr_detail = pr_item.name
+		pi.save()
 		pi.submit()
 
-		# Run and validate the function
+		#validate the function
 		billed_qty_map = get_billed_qty_against_purchase_receipt(pr_doc)
 		self.assertIn(pr_item.name, billed_qty_map)
 		self.assertEqual(billed_qty_map[pr_item.name], 3)
