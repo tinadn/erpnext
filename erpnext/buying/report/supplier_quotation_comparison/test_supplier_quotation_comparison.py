@@ -47,6 +47,13 @@ class TestSupplierQuotationComparison(FrappeTestCase):
 		self.assertEqual(expired_data.get("item_code"), "_Test FG Item")
 		self.assertEqual(expired_data.get("supplier_name"), "_Test Supplier")
 
+		# based on item_code
+		self.filters["item_code"] = "_Test FG Item"
+		i_data = execute(self.filters)
+		based_on_item = i_data[1][0]
+		self.assertEqual(based_on_item.get("item_code"), "_Test FG Item")
+		self.assertEqual(based_on_item.get("supplier_name"), "_Test Supplier")
+
 def create_supplier_quotation():
 	sq = frappe.copy_doc(test_records[0]).insert()
 	sq = frappe.get_doc("Supplier Quotation", sq.name)
