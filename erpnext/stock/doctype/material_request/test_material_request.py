@@ -4897,6 +4897,7 @@ class TestMaterialRequest(FrappeTestCase):
 		self.assertEqual(serial_cnt, 1)
 		serial_cnt = frappe.db.count('Serial No',{'purchase_document_no':pr1.name})
 		self.assertEqual(serial_cnt, 1)
+		
 	def test_create_material_req_to_2po_to_pi_TC_SCK_095(self):
 		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
 		create_company()
