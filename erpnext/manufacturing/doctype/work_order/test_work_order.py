@@ -3578,7 +3578,6 @@ class TestWorkOrder(FrappeTestCase):
 			raw_materials=[item_raw],
 			rm_qty=10
 		)
-		make_stock_entry(item_code="Test raw material", qty=200, rate=500, target="Stores - _TC")
 
 		# Create a work order
 		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10,do_not_submit=1)
@@ -3588,6 +3587,26 @@ class TestWorkOrder(FrappeTestCase):
 		self.assertEqual(wo_doc.bom_no, bom_doc.name)
 		self.assertEqual(wo_doc.status, "Not Started")
 
+		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Consumption for Manufacture", 10))
+		stock_entry = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"company": wo_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"posting_time": frappe.utils.nowtime(),
+			"items": [
+				{
+					"item_code": item_raw.name,
+					"qty": 100,
+					"uom": "Nos",
+					"stock_uom": "Nos",
+					"t_warehouse": "Stores - _TC",
+					"basic_rate": 50
+				}
+			]
+		})
+		stock_entry.insert()
+		stock_entry.submit()
 		# Create a stock entry to consumption the item
 		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Consumption for Manufacture", 10))
 		for row in ste_doc.items:
@@ -3631,7 +3650,6 @@ class TestWorkOrder(FrappeTestCase):
 			raw_materials=[item_raw],
 			rm_qty=10
 		)
-		make_stock_entry(item_code="Test raw material", qty=200, rate=500, target="Stores - _TC")
 
 		# Create a work order
 		wo_doc = make_wo_order_test_record(production_item=item_code, qty=10,do_not_submit=1)
@@ -3648,8 +3666,28 @@ class TestWorkOrder(FrappeTestCase):
 				item_code=row.item_code, target="Stores - _TC", qty=row.qty, basic_rate=100
 			)
 		ste_doc.save()
-		ste_doc.submit()
+		ste_doc.submit()	
 		
+		stock_entry = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"company": wo_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"posting_time": frappe.utils.nowtime(),
+			"items": [
+				{
+					"item_code": item_raw.name,
+					"qty": 100,
+					"uom": "Nos",
+					"stock_uom": "Nos",
+					"t_warehouse": "Stores - _TC",
+					"basic_rate": 50
+				}
+			]
+		})
+		stock_entry.insert()
+		stock_entry.submit()
+
 		# Create a stock entry to manufacture the item
 		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Manufacture", 10))
 		for row in ste_doc.items:
@@ -3751,7 +3789,6 @@ class TestWorkOrder(FrappeTestCase):
 			rm_qty=10,
 			do_not_submit=True
 		)
-		make_stock_entry(item_code="Test raw material", qty=200, rate=500, target="Stores - _TC")
 		item_scrap = make_item("Test scrap material1")
 		frappe.db.set_value('Item',item_scrap.item_code,'valuation_rate',20)
 		bom_doc.append("scrap_items", {"item_code": item_scrap.item_code, "qty": 1})
@@ -3764,6 +3801,26 @@ class TestWorkOrder(FrappeTestCase):
 		wo_doc.submit()
 		self.assertEqual(wo_doc.bom_no, bom_doc.name)
 		self.assertEqual(wo_doc.status, "Not Started")
+
+		stock_entry = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"company": wo_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"posting_time": frappe.utils.nowtime(),
+			"items": [
+				{
+					"item_code": item_raw.name,
+					"qty": 100,
+					"uom": "Nos",
+					"stock_uom": "Nos",
+					"t_warehouse": "Stores - _TC",
+					"basic_rate": 50
+				}
+			]
+		})
+		stock_entry.insert()
+		stock_entry.submit()
 
 		# Create a stock entry to consumption the item
 		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Consumption for Manufacture", 10))
@@ -3809,7 +3866,6 @@ class TestWorkOrder(FrappeTestCase):
 			rm_qty=10,
 			do_not_submit=True
 		)
-		make_stock_entry(item_code="Test raw material", qty=200, rate=500, target="Stores - _TC")
 		item_scrap = make_item("Test scrap material1")
 		frappe.db.set_value('Item',item_scrap.item_code,'valuation_rate',20)
 		bom_doc.append("scrap_items", {"item_code": item_scrap.item_code, "qty": 1})
@@ -3822,6 +3878,26 @@ class TestWorkOrder(FrappeTestCase):
 		wo_doc.submit()
 		self.assertEqual(wo_doc.bom_no, bom_doc.name)
 		self.assertEqual(wo_doc.status, "Not Started")
+
+		stock_entry = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"company": wo_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"posting_time": frappe.utils.nowtime(),
+			"items": [
+				{
+					"item_code": item_raw.name,
+					"qty": 100,
+					"uom": "Nos",
+					"stock_uom": "Nos",
+					"t_warehouse": "Stores - _TC",
+					"basic_rate": 50
+				}
+			]
+		})
+		stock_entry.insert()
+		stock_entry.submit()
 
 		# Create a stock entry to consumption the item
 		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Consumption for Manufacture", 10))
@@ -3871,7 +3947,6 @@ class TestWorkOrder(FrappeTestCase):
 			rm_qty=10,
 			do_not_submit=True
 		)
-		make_stock_entry(item_code="Test raw material", qty=200, rate=500, target="Stores - _TC")
 		item_scrap = make_item("Test scrap material1")
 		frappe.db.set_value('Item',item_scrap.item_code,'valuation_rate',20)
 		bom_doc.append("scrap_items", {"item_code": item_scrap.item_code, "qty": 1})
@@ -3884,6 +3959,26 @@ class TestWorkOrder(FrappeTestCase):
 		wo_doc.submit()
 		self.assertEqual(wo_doc.bom_no, bom_doc.name)
 		self.assertEqual(wo_doc.status, "Not Started")
+
+		stock_entry = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"company": wo_doc.company,
+			"posting_date": frappe.utils.nowdate(),
+			"posting_time": frappe.utils.nowtime(),
+			"items": [
+				{
+					"item_code": item_raw.name,
+					"qty": 100,
+					"uom": "Nos",
+					"stock_uom": "Nos",
+					"t_warehouse": "Stores - _TC",
+					"basic_rate": 50
+				}
+			]
+		})
+		stock_entry.insert()
+		stock_entry.submit()
 
 		# Create a stock entry to consumption the item
 		ste_doc = frappe.get_doc(make_stock_entry(wo_doc.name, "Material Consumption for Manufacture", 10))
