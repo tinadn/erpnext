@@ -4265,6 +4265,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 					"doctype":"Item Tax Template",
 					"title": gst.get("template"),
 					"company":"_Test Company",
+					"gst_rate": gst.get("rate"),
 					"taxes":[
 						{
 							"tax_type":"Marketing Expenses - _TC",
@@ -4272,7 +4273,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 						}
 					]}
 					
-					).insert(ignore_permissions=True)
+					).insert(ignore_permissions=True, ignore_if_duplicate=True)
 		purchase_taxes_template = create_or_get_purchase_taxes_template("_Test Company")
 
 		gst_rates = [
