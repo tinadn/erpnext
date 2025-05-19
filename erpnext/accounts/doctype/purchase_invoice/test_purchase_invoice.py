@@ -3557,23 +3557,36 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 	def test_fully_paid_of_pi_to_pr_to_pe_with_gst_TC_B_084(self):
 		frappe.set_user("Administrator")
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_entry
+		template = frappe.get_all(
+			"Purchase Taxes and Charges Template",
+			filters={
+				"company": "_Test Company",
+				"tax_category": "_Test Tax Category 1",
+				"disabled": 0,
+			},
+			fields=["name"],
+			limit=1
+		)
 
-		purchase_tax = frappe.new_doc("Purchase Taxes and Charges Template")
-		purchase_tax.title = "TEST"
-		purchase_tax.company = "_Test Company"
-		purchase_tax.tax_category = "_Test Tax Category 1"
+		if not template:
+			purchase_tax = frappe.new_doc("Purchase Taxes and Charges Template")
+			purchase_tax.title = "TEST"
+			purchase_tax.company = "_Test Company"
+			purchase_tax.tax_category = "_Test Tax Category 1"
 
-		purchase_tax.append("taxes",{
-			"category":"Total",
-			"add_deduct_tax":"Add",
-			"charge_type":"On Net Total",
-			"account_head":"_Test Account Excise Duty - _TC",
-			"_Test Account Excise Duty":"_Test Account Excise Duty",
-			"rate":100,
-			"description":"GST"
-		})
+			purchase_tax.append("taxes", {
+				"category": "Total",
+				"add_deduct_tax": "Add",
+				"charge_type": "On Net Total",
+				"account_head": "_Test Account Excise Duty - _TC",
+				"rate": 100,
+				"description": "GST"
+			})
 
-		purchase_tax.save()
+			purchase_tax.insert()
+		else:
+			purchase_tax = frappe.get_doc("Purchase Taxes and Charges Template", template[0].name)
+
 		pi = make_purchase_invoice(
 			qty=1,
 			item_code="_Test Item",
