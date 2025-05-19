@@ -5976,6 +5976,7 @@ class TestSalesInvoice(FrappeTestCase):
 		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
 		get_or_create_fiscal_year("_Test Company")
 		item = create_item("_Test Item 1")
+		create_customer(customer_name="_Test Customer",company="_Test Company")
 		shipping_rule = create_shipping_rule(
 			shipping_rule_type="Selling", 
 			shipping_rule_name="Shipping Rule - Test Fixed",
