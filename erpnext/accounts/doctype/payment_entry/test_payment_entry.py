@@ -2270,15 +2270,17 @@ def create_account():
 
 def create_records(supplier):
 	from erpnext.accounts.doctype.tax_withholding_category.test_tax_withholding_category import create_tax_withholding_category
+	from erpnext.accounts.utils import get_fiscal_year
 	create_company()
  
 	create_account()
+	today = frappe.utils.getdate()
 
 	create_tax_withholding_category(
 			category_name="Test - TDS - 194C - Company",
 			rate=2,
-			from_date=frappe.utils.get_date_str('01-04-2024'),
-			to_date=frappe.utils.get_date_str('31-03-2025'),
+			from_date=fiscal_year["year_start_date"],
+			to_date=fiscal_year["year_end_date"],
 			account="_Test TDS Payable - _TC",
 			single_threshold=30000,
 			cumulative_threshold=100000,
