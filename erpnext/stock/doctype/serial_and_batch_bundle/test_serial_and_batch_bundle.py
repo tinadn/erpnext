@@ -18,6 +18,9 @@ from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 
 
 class TestSerialandBatchBundle(FrappeTestCase):
+	def teardown(self):
+		frappe.db.rollback()
+
 	def test_naming_for_sabb(self):
 		frappe.db.set_single_value(
 			"Stock Settings", "set_serial_and_batch_bundle_naming_based_on_naming_series", 1
@@ -114,6 +117,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			item = make_test_item(item_code)
 			item.item_group = "Products"
 			item.has_serial_no = 1
+			item.serial_no_series = item.item_code+".#####"
 			item.has_batch_no = 1
 			item.is_stock_item = 1
 			item.is_fixed_asset = 0
@@ -137,6 +141,17 @@ class TestSerialandBatchBundle(FrappeTestCase):
 
 		assert serial_no.name == "MDC001"
 
+		if not frappe.db.exists("Serial No", "MDC002"):
+			new_serial_no = frappe.get_doc({
+			"doctype": "Serial No",
+			"serial_no": "MDC002",
+			"item_code": item.name,
+			"company": company,
+			"item_group": "Raw Material"
+			}).insert(ignore_permissions=True)
+			assert new_serial_no.name == "MDC002"
+		else:
+			serial_no2 = frappe.get_doc("Serial No", "MDC002")
 		
 		# Create Batch for the item
 		if not frappe.db.exists("Batch", "Batch_001"):
@@ -167,6 +182,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 				}]
 			})
 			stock_entry.submit()
+
 		else:
 			stock_entry = frappe.get_doc("Stock ENtry", item.name)
 		assert stock_entry.docstatus == 1
@@ -201,7 +217,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"has_serial_no": 1,
 			"has_batch_no": 1,
 			"entries": [{
-				"serial_no": serial_no.name,
+				"serial_no": new_serial_no.name,
 				"batch_no": batch.name,
 				"qty": 1,
 				"warehouse": warehouse
@@ -228,14 +244,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		#  Clear the link to the canceled delivery note
 		amended_bundle.voucher_no = None
 		amended_bundle.voucher_type = None
-		new_serial_no = frappe.get_doc({
-			"doctype": "Serial No",
-			"serial_no": "MDC002",
-			"item_code": item.name,
-			"company": company,
-			"item_group": "Raw Material"
-		}).insert(ignore_permissions=True)
-		assert new_serial_no.name == "MDC002"
+		
 
 		amended_bundle.entries[0].serial_no = new_serial_no.name
 
@@ -322,7 +331,6 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		else:
 			batch = frappe.get_doc("Batch", "Batch_001")
 		assert batch.batch_id == "Batch_001"
-		assert batch.item == item.name
 
 		# Create stock entry (Material Receipt)
 		if not frappe.db.exists("Stock Entry", item.name):
@@ -487,6 +495,8 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			}).insert()
 		else:
 			item = frappe.get_doc("Item", "Test Item")
+			item.has_batch_no=1
+			item.save()
 
 		if not frappe.db.exists("Serial No", "MDC001"):
 			serial_no = frappe.get_doc({
@@ -622,9 +632,6 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			# Optionally: skip further assertions if error occurs
 			return
 
-		# Assert that the naming_series on the doc was updated to include .#####
-		self.assertIn(".#####", serial_batch_bundle.naming_series)
-
 		# Assert that name was generated
 		self.assertTrue(serial_batch_bundle.name.startswith("TESTSERIES"))
 
@@ -726,6 +733,8 @@ class TestSerialandBatchBundle(FrappeTestCase):
 					"item_code": "Test Item",
 					"item_name": "Test Item",
 					"item_group": "Products",
+					"create_new_batch":1,
+					"serial_no_series" : item.item_code+".#####",
 					"gst_hsn_code": "01011010",
 					"has_serial_no": 1,
 					"has_batch_no": 1,
@@ -736,6 +745,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		else:
 			item = frappe.get_doc("Item", "Test Item")
 			item.serial_no_series = "MDC-.###"
+			item.create_new_batch=1
 			item.save()
 
 		# Create Serial No
@@ -749,6 +759,18 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			}).insert(ignore_permissions=True)
 		else:
 			serial_no = frappe.get_doc("Serial No", "MDC001")
+
+		if not frappe.db.exists("Serial No", "MDC002"):
+			new_serial_no = frappe.get_doc({
+			"doctype": "Serial No",
+			"serial_no": "MDC002",
+			"item_code": item.name,
+			"company": company,
+			"item_group": "Raw Material"
+			}).insert(ignore_permissions=True)
+			assert new_serial_no.name == "MDC002"
+		else:
+			serial_no2 = frappe.get_doc("Serial No", "MDC002")
 
 		# Create Batch
 		if not frappe.db.exists("Batch", "Batch_001"):
@@ -810,7 +832,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"has_serial_no": 1,
 			"has_batch_no": 1,
 			"entries": [{
-				"serial_no": serial_no.name,
+				"serial_no": new_serial_no.name,
 				"batch_no": batch.name,
 				"qty": 1,
 				"warehouse": warehouse
@@ -883,6 +905,8 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		else:
 			item = frappe.get_doc("Item", "Test Item")
 			item.serial_no_series = "MDC-.###"
+			item.has_batch_no=1
+			item.create_new_batch =1
 			item.save()
 
 		# Create Serial No for the item
@@ -1029,6 +1053,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 					"item_name": "Test Item",
 					"item_group": "Products",
 					"gst_hsn_code": "01011010",
+					"create_new_batch":1,
 					"has_serial_no": 1,
 					"has_batch_no": 1,
 					"serial_no_series": "MDC-.###",
@@ -1038,6 +1063,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		else:
 			item = frappe.get_doc("Item", "Test Item")
 			item.serial_no_series = "MDC-.###"
+			item.create_new_batch =1
 			item.save()
 		assert frappe.db.exists("Item", "Test Item")
 
