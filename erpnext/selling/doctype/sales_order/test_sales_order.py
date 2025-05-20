@@ -7331,6 +7331,6 @@ def set_credit_limit_for_customer(customer_name):
 	customer.credit_limits.clear()
 	customer.append(
 				"credit_limits",
-				{"company": "_Test Company", "credit_limit": 1000000.00},
+				{"company": "_Test Company", "credit_limit": 100000000000.00},
 			)
 	customer.save()
