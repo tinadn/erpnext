@@ -2,6 +2,7 @@
 # License: GNU General Public License v3. See license.txt
 
 import json
+import re
 
 from erpnext.selling.doctype.customer.customer import get_customer_outstanding
 import frappe
@@ -6160,6 +6161,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
   
 		return delivery_note
 	
+	@change_settings("Accounts Settings", {"credit_controller": "Administrator"})
 	def test_unlink_advance_payment_on_order_cancellation_TC_ACC_127(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
 			make_test_item,
@@ -6170,7 +6172,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		account_setting.unlink_advance_payment_on_cancelation_of_order = 0
 		account_setting.save()
 
-		item = make_test_item("_Test Item")
+		item = make_item("_Test Item")
 		try:
 			so = make_sales_order(
 				customer="_Test Customer",
@@ -6186,6 +6188,10 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 			so.cancel()
 		except Exception as e:
 			error_message = str(e)
+			# Remove HTML tags only if present
+			if "<" in error_message and ">" in error_message:
+				error_message = re.sub(r'<[^>]+>', '', error_message)
+
 			self.assertEqual(error_message, f"Cannot delete or cancel because Sales Order {sales_oreder_name} is linked with Payment Entry {pe.name} at Row: 1")
 		
 	def test_customer_credit_limit_bypass_TC_ACC_139(self):
