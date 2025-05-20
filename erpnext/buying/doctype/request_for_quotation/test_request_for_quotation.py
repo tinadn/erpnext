@@ -187,7 +187,6 @@ class TestRequestforQuotation(FrappeTestCase):
 			"reference_doctype": "Request for Quotation",
 			"reference_name": self.rfq.name
 		})
-		print('rfq_name', self.rfq.name)
 		self.assertGreaterEqual(len(communications), 1)
 
 	def test_get_supplier_email_preview_TC_B_194(self):
