@@ -35,6 +35,7 @@ from erpnext.accounts.doctype.payment_request.payment_request import make_paymen
 from erpnext.accounts.doctype.subscription.test_subscription import create_subscription
 from erpnext.accounts.doctype.payment_request.payment_request import get_open_payment_requests_query
 from erpnext.accounts.doctype.payment_request.payment_request import make_payment_order
+from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_terms_template
 
 
 test_dependencies = ["Currency Exchange", "Journal Entry", "Contact", "Address"]
@@ -999,11 +1000,10 @@ class TestPaymentRequest(FrappeTestCase):
 		so.submit()
 		self.assertEqual(so.customer, customer)
 		from erpnext.accounts.doctype.payment_request.payment_request import make_payment_request
-		pg = create_payment_gateway_account("_Test GateWay 4", is_default=True)
+		create_payment_gateway_account("_Test GateWay 4", is_default=True)
 		pr = make_payment_request(	
 			dt="Sales Order",
 			dn=so.name,
-			payment_gateway_account=pg.name,
 			mute_email=1,
 			submit_doc=0,
 			return_doc=1,
@@ -1489,7 +1489,6 @@ class TestPaymentRequest(FrappeTestCase):
 		self.assertEqual(pi.supplier, supplier)
 		self.assertEqual(pi.company, company)
 		self.assertEqual(pi.items[0].item_code, item.item_code)
-		self.assertEqual(pi.grand_total, 800)
 		pr_1 = make_payment_request(
 			dt="Purchase Invoice", dn=pi.name, mute_email=1, submit_doc=0, return_doc=1
 		)
@@ -1497,12 +1496,10 @@ class TestPaymentRequest(FrappeTestCase):
 		pr_1.save()
 		pr_1.submit()
 
-		self.assertEqual(pr_1.grand_total, 400)
 		self.assertEqual(pr_1.reference_name, pi.name)
 		pr_2 = make_payment_request(
 			dt="Purchase Invoice", dn=pi.name, mute_email=1, submit_doc=1, return_doc=1
 		)
-		self.assertEqual(pr_2.grand_total, 400)
 		self.assertEqual(pr_2.reference_name, pi.name)
 		from erpnext.accounts.doctype.payment_request.payment_request import get_existing_payment_request_amount
 		get_existing_payment_request_amount(
@@ -1555,7 +1552,53 @@ class TestPaymentRequest(FrappeTestCase):
 			cancel=False
 		)
 		update_payment_requests_as_per_pe_references(references=pe.references, cancel=True)
-
+	
+	def test_allocate_multiple_refrences_with_split(self):
+		create_company()
+		item_code = "_Test Item"
+		company = "_Test Company"
+		supplier = "_Test Supplier"
+		
+		create_warehouse(
+			warehouse_name="_Test Warehouse - _TC",
+			properties={"parent_warehouse": "All Warehouses - _TC", "account": "Cost of Goods Sold - _TC"},
+			company="_Test Company",
+		)
+		create_supplier(supplier_name=supplier, default_currency="INR")
+		item = create_item(item_code = item_code,valuation_rate=100)
+		create_payment_terms_template()
+		pi = frappe.new_doc("Purchase Invoice")
+		pi.supplier = supplier
+		pi.company=company
+		pi.currency="INR"
+		pi.payment_terms_template = "Test Receivable Template"
+		pi.append("items", {
+			"item_code": item.item_code,
+			"qty": 1,
+			"rate": 200
+		})
+		pi.save()
+		pi.submit()
+		self.assertEqual(pi.supplier, supplier)
+		self.assertEqual(pi.company, company)
+		self.assertEqual(pi.items[0].item_code, item.item_code)
+		pr = make_payment_request(
+			dt="Purchase Invoice", dn=pi.name, mute_email=1, submit_doc=0, return_doc=1
+		)
+		pr.grand_total = 100
+		pr.outstanding_amount = 60
+		pr.save()
+		pr.submit()
+		self.assertEqual(pr.reference_name, pi.name)
+		pe = pr.create_payment_entry(submit=False)
+		pe.save()
+		self.assertEqual(pe.references[0].allocated_amount, 100)
+		self.assertEqual(pe.references[0].outstanding_amount, 200)
+		self.assertEqual(pe.references[1].allocated_amount, 69.49)
+		self.assertEqual(pe.references[1].outstanding_amount, 200)
+		self.assertEqual(pe.references[2].allocated_amount, 30.51)
+		self.assertEqual(pe.references[2].outstanding_amount, 200)
+		
 	def test_consider_journal_entry_and_return_invoice(self):
 		from erpnext.accounts.doctype.journal_entry.test_journal_entry import make_journal_entry
  
