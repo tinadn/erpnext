@@ -340,6 +340,115 @@ class TestQualityInspection(FrappeTestCase):
 		# Ensure frappe.db.set_value is called to assign "ROW-3" to qi2 if needed
 		mock_set_value.assert_not_called()
 
+	def test_item_query_04(self):
+		from erpnext.stock.doctype.quality_inspection.quality_inspection import item_query
+
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		company = setup_test_company_defaults()
+
+		# Create item that requires inspection before purchase
+		item = create_item(
+			item_code="_Test Item for PR Query", stock_uom="Nos", valuation_rate=200, is_stock_item=1
+		)
+		frappe.db.set_value("Item", item.name, "inspection_required_before_purchase", 1)
+		frappe.db.set_value("Item", item.name, "inspection_required_before_delivery", 1)
+
+		# # Create supplier
+		# from erpnext.buying.doctype.supplier.test_supplier import create_supplier
+
+		# supplier = create_supplier(supplier_name="_Test Supplier for Query")
+
+		# Create purchase receipt with the item
+		pr = make_purchase_receipt(
+			item_code=item.name, company="_Test Company", stock_uom="Box", do_not_submit=True
+		)
+
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_customer
+
+		create_customer(name="_Test Customer")
+		dn = create_delivery_note(item_code=item.name, do_not_submit=True)
+		wh = create_warehouse("_Test Warehouse - _TC", company=company.name)
+		se = make_stock_entry(
+			item_code=item.name,
+			target=wh,
+			qty=1,
+			basic_rate=100,
+			inspection_required=True,
+			do_not_submit=True,
+		)
+
+		from frappe.utils import add_days, add_months, flt, getdate, nowdate, today
+
+		from erpnext.buying.doctype.supplier_quotation.supplier_quotation import set_expired_status
+
+		if not frappe.db.exists("Price List", "_Test Price List"):
+			pl = frappe.new_doc("Price List")
+			pl.price_list_name = "_Test Price List"
+			pl.selling = 1
+			pl.buying = 1
+			pl.enabled = 1
+			pl.insert()
+		test_records = frappe.get_test_records("Supplier Quotation")
+		sq = frappe.copy_doc(test_records[0])
+		sq.price_list = "_Test Price List"
+		sq.items = []
+		sq.append("items", {"item_code": item.name, "uom": "Nos", "qty": 5, "rate": 100})
+		sq.insert()
+		sq = frappe.get_doc("Supplier Quotation", sq.name)
+		sq.transaction_date = today()
+		sq.valid_till = add_days(today(), 30)
+		sq.submit()
+		set_expired_status()
+		sq.reload()
+
+		# --- Run item_query ---
+		result1 = item_query(
+			doctype="Item",
+			txt="_Test Item",
+			searchfield="item_code",
+			start=0,
+			page_len=10,
+			filters={"from": "Purchase Receipt Item", "parent": pr.name, "inspection_type": "Incoming"},
+		)
+		result2 = item_query(
+			doctype="Item",
+			txt="_Test Item",
+			searchfield="item_code",
+			start=0,
+			page_len=10,
+			filters={"from": "Delivery Note Item", "parent": dn.name, "inspection_type": "Outgoing"},
+		)
+		result3 = item_query(
+			doctype="Item",
+			txt="_Test Item",
+			searchfield="item_code",
+			start=0,
+			page_len=10,
+			filters={"from": "Stock Entry Detail", "parent": se.name, "inspection_type": "Outgoing"},
+		)
+		result4 = item_query(
+			doctype="Item",
+			txt="_Test Item",
+			searchfield="item_code",
+			start=0,
+			page_len=10,
+			filters={"from": "Supplier Quotation Item", "parent": sq.name, "inspection_type": "Incoming"},
+		)
+		# --- Assertion ---
+		if len(result1) > 0:
+			assert len(result1) == 1
+			assert item.name in [r[0] for r in result1]
+		if len(result2) > 0:
+			assert len(result2) == 1
+			assert item.name in [r[0] for r in result2]
+		if len(result3) > 0:
+			assert len(result3) == 1
+			assert item.name in [r[0] for r in result3]
+		if len(result4) > 0:
+			assert len(result4) == 1
+			assert item.name in [r[0] for r in result4]
+
 	def test_qa_for_delivery(self):
 		make_stock_entry(
 			item_code="_Test Item with QA", target="_Test Warehouse - _TC", qty=1, basic_rate=100
