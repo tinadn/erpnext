@@ -28,5 +28,11 @@
   "is_group": 0, 
   "parent_territory": "All Territories", 
   "territory_name": "_Test Territory United States"
+ },
+ {
+  "doctype": "Territory", 
+  "is_group": 0, 
+  "parent_territory": "All Territories", 
+  "territory_name": "India"
  }
 ]
