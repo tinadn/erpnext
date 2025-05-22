@@ -5203,7 +5203,8 @@ class TestPurchaseReceipt(FrappeTestCase):
 			purpose="Material Receipt",
 			do_not_submit=True,
 		)
-		se1.items[0].to_inv_site = "Site 1"
+		se1.items[0].inv_site = "Site 1"
+		se1.save()
 		se1.submit()
 
 		from erpnext.stock.report.stock_ledger.stock_ledger import execute
@@ -5249,6 +5250,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		if not frappe.db.exists("Item Group", {"item_group_name": "_Test Group"}):
 			item_group = frappe.new_doc("Item Group")
 			item_group.item_group_name = "_Test Group"
+			item_group.parent_item_group = "All Item Groups"
 			item_group.insert()
 		warehouse_new = create_warehouse("Stores", properties=None, company="_Test Company")
 		item_code = make_item(
@@ -5257,9 +5259,11 @@ class TestPurchaseReceipt(FrappeTestCase):
 				"item_name": "_Test Item225",
 				"valuation_rate": 500,
 				"is_stock_item": 1,
-				"item_group": "_Test Group",
+				"item_group": item_group.name,
 			},
-		).name
+		)
+		item_code.item_group = item_group.name
+		item_code.save()
 		se1 = make_stock_entry(
 			item_code=item_code,
 			qty=10,
@@ -5267,7 +5271,8 @@ class TestPurchaseReceipt(FrappeTestCase):
 			purpose="Material Receipt",
 			do_not_submit=True,
 		)
-		se1.items[0].to_inv_site = "Site 1"
+		se1.items[0].inv_site = "Site 1"
+		se1.save()
 		se1.submit()
 
 		from erpnext.stock.report.stock_ledger.stock_ledger import execute
@@ -5835,6 +5840,19 @@ class TestPurchaseReceipt(FrappeTestCase):
 		for pr in [pr1, pr2]:
 			for item in pr.items:
 				frappe.db.set_value("Purchase Receipt Item", item.name, "purchase_order_item", po_item.name)
+
+		settings = frappe.get_doc("Repost Accounting Ledger Settings")
+		# Check if Purchase Invoice is already allowed
+		already_allowed = any(
+			d.document_type == "Purchase Invoice" and d.allowed for d in settings.allowed_types
+		)
+		if not already_allowed:
+			# Remove existing row for Purchase Invoice
+			settings.allowed_types = [
+				d for d in settings.allowed_types if d.document_type != "Purchase Invoice"
+			]
+			settings.append("allowed_types", {"document_type": "Purchase Invoice", "allowed": 1})
+			settings.save()
 
 		pi1 = make_purchase_invoice(
 			purchase_order=po.name,
