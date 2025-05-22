@@ -3081,6 +3081,7 @@ class TestMaterialRequest(FrappeTestCase):
 	def test_mr_to_pe_flow_TC_B_080(self):
 		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import get_sl_entries, get_gl_entries
 		# Scenario : MR=>PO=> Partial PE=>PR=>PI=>Rm PE (With GST)
+		make_item(item_code="Testing-31")
 		mr_dict_list = {
 				"company" : "_Test Company",
 				"purpose":"Purchase",
@@ -4602,7 +4603,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_purchase_flow_TC_B_068(self):
 		#Scenario : MR=>PO=>PR=>PI [With Shipping Rule]
-		
+		make_item(item_code="Testing-31")
 		args = {
 					"calculate_based_on" : "Fixed",
 					"shipping_amount" : 200
@@ -4636,7 +4637,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_purchase_flow_TC_B_069(self):
 		#Scenario: MR=>SQ=>PO=>PR=>PI [With SQ and Shipping Rule]
-		
+		make_item(item_code="Testing-31")
 		args = {
 					"calculate_based_on" : "Fixed",
 					"shipping_amount" : 200
@@ -6155,7 +6156,7 @@ class TestMaterialRequest(FrappeTestCase):
 		# MR =>  PO => PE => PR => PI
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_term
 		create_payment_term("Basic Amount Receivable for Selling")
-		item = make_test_item("Testing-31")
+		make_item(item_code="Testing-31")
 
 		mr_dict_list = {
 				"company" : "_Test Company",
@@ -6246,7 +6247,7 @@ class TestMaterialRequest(FrappeTestCase):
 
 	def test_mr_to_pi_TC_B_078(self):
 		#Scenario: MR=>SQ=>PO=>PE=>PR=>PI [With SQ, Shipping Rule and Shipping Rule]
-		
+		make_item(item_code="Testing-31")
 		args = {
 					"calculate_based_on" : "Fixed",
 					"shipping_amount" : 200
