@@ -27,3 +27,12 @@ class TestCustomerWiseItemPrice(FrappeTestCase):
 			if row.get("item_code") == self.item.item_code:
 				self.assertEqual(row.get("item_code"), "_Test CWIPP Item")
 				self.assertEqual(row.get("selling_rate"), 0)
+
+	def test_validate_filters_codecov(self):
+		self.filters = {}
+		with self.assertRaises(frappe.exceptions.ValidationError) as e:
+			data = execute(self.filters)
+
+		self.filters = {"customer": self.customer.name}
+		data = execute(self.filters)
+		self.assertTrue(data)
