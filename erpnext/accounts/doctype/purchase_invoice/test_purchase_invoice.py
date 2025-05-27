@@ -3287,6 +3287,15 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 	def test_invoice_status_on_payment_entry_submit_TC_B_035_and_TC_B_037(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_entry
 		from erpnext.accounts.doctype.unreconcile_payment.unreconcile_payment import get_linked_payments_for_doc
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_payment_term
+		create_payment_term("Basic Amount Receivable for Selling")
+		settings = frappe.get_doc("Repost Accounting Ledger Settings")
+		if not any(d.document_type == "Purchase Invoice" for d in settings.allowed_types):
+			settings.append("allowed_types", {
+				"document_type": "Purchase Invoice",
+				"allowed": 1
+			})
+			settings.save()
 		pi = make_purchase_invoice(
 			qty=1,
 			item_code="_Test Item",
@@ -3296,9 +3305,16 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		)
 
 		pi.save()
+		pi.reload()
 		pi.submit()
 		pi_status_before = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status_before, "Unpaid")
+
+
+		payment_term = None
+		if pi.payment_schedule:
+			payment_term = pi.payment_schedule[0].payment_term
+
 
 		pe = create_payment_entry(
 			company="_Test Company",
@@ -3309,20 +3325,25 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 			paid_from ="Cash - _TC",
 			paid_amount=pi.grand_total,
 		)
-		pe.append("references", {"reference_doctype": "Purchase Invoice", "reference_name": pi.name,"allocated_amount":pi.rounded_total})
+
+
+		pe.append("references", {"reference_doctype": "Purchase Invoice", "reference_name": pi.name,"allocated_amount":pi.rounded_total,"payment_term": payment_term})
 		pe.save()
-		pe.submit()
 		pe.reload()
-		pi.reload()
+		pe.submit()
 		pi_status_after = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status_after, "Paid")
 
 		return_pi = make_debit_note(pi.name)
 		return_pi.update_outstanding_for_self = 0
 		return_pi.save()
+		return_pi.reload()
 		return_pi.submit()
+		
 		self.assertEqual(return_pi.status, "Return")
 
+		pi.reload()
+		pi.update_outstanding_for_self = 0
 		pi.reload()
 		self.assertEqual(pi.status, "Debit Note Issued")
 
@@ -4801,7 +4822,6 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 			pi.save().submit()
 		except Exception as e:
-			print(str(e))
 			self.assertEqual(str(e),"""Annual Budget for Account Cost of Goods Sold - _TC against Cost Center _Test Write Off Cost Center - _TC is ₹ 10,000.00. It will be exceed by ₹ 1,000.00Total Expenses booked through - Actual Expenses - ₹ 0.00Material Requests - ₹ 0.00Unbilled Orders - ₹ 0.00""")
 
 			budget.cancel()
@@ -4922,13 +4942,13 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		To test if after applying discount on grand total,
 		the grand total is calculated correctly without any rounding errors
 		"""
-		invoice = make_purchase_invoice(qty=3, rate=100, do_not_save=True, do_not_submit=True)
+		invoice = make_purchase_invoice(qty=2, rate=100, do_not_save=True, do_not_submit=True)
 		invoice.append(
 			"items",
 			{
 				"item_code": "_Test Item",
-				"qty": 3,
-				"rate": 50.3,
+				"qty": 1,
+				"rate": 21.39,
 			},
 		)
 		invoice.append(
@@ -4937,19 +4957,18 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 				"charge_type": "On Net Total",
 				"account_head": "_Test Account VAT - _TC",
 				"description": "VAT",
-				"rate": 15,
+				"rate": 15.5,
 			},
 		)
 
-		# the grand total here will be 518.54
+		# the grand total here will be 255.71
 		invoice.disable_rounded_total = 1
-		# apply discount on grand total to adjust the grand total to 518
-		invoice.discount_amount = 0.54
-
+		# apply discount on grand total to adjust the grand total to 255
+		invoice.discount_amount = 0.71
 		invoice.save()
 
-		# check if grand total is 518 and not something like 517.99 due to rounding errors
-		self.assertEqual(invoice.grand_total, 518)
+		# check if grand total is 496 and not something like 254.99 due to rounding errors
+		self.assertEqual(invoice.grand_total, 255)
 
 	def test_apply_discount_on_grand_total_with_previous_row_total_tax(self):
 		"""
