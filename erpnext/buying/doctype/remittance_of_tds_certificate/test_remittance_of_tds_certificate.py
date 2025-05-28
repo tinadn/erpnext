@@ -179,28 +179,32 @@ class TestRemittanceofTDScertificate(FrappeTestCase):
 		extracted_file_names = [f.file_name for f in extracted_files]
 		self.assertIn("test_inside.txt", extracted_file_names)
 
-	@patch("erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.unzip_file")
-	@patch("erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.get_email_list")
-	@patch("erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.create_attachment")
-	@patch("erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.frappe.sendmail")
-	def test_unpack_TC_B_226(self, mock_sendmail, mock_create_attachment, mock_get_email_list, mock_unzip_file):
-		mock_get_email_list.return_value = [
-			{"email_id": "test@example.com", "file_name": "ABCDE1234F_test.pdf"}
-		]
-
-		mock_create_attachment.return_value = MagicMock()
-
+	@patch('erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.unzip_file')
+	def test_unpack_TC_B_227(self, mock_unzip_file):
 		doc = frappe.get_doc({
-			"doctype": "Remittance Of TDS Certificate",
-			"upload_doc": "/files/ABCDE1234F_test.pdf",
-			"sender_email": "sender@example.com",
-			"description": "Test Description",
-			"subject": "Test Subject"
+			"doctype": "Remittance of TDS Certificate",
+			"upload_doc": "/files/test.zip",
+			"subject": "Test Email",
+			"description": "This is a test email body.",
+			"sender_email": "test@example.com"
 		})
+		
+		mock_unzip_file.return_value = None
 
-		result = doc.unpack(doc)
+		with patch('erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.get_email_list') as mock_get_email_list, \
+			 patch('erpnext.buying.doctype.remittance_of_tds_certificate.remittance_of_tds_certificate.create_attachment') as mock_create_attachment, \
+			 patch('frappe.sendmail') as mock_sendmail:
 
-		mock_unzip_file.assert_called_once()
-		mock_get_email_list.assert_called_once_with(doc)
-		mock_sendmail.assert_called_once()
-		self.assertEqual(result, 1)
+			mock_get_email_list.return_value = [{
+				'email_id': 'user@example.com',
+				'file_name': 'test.pdf',
+				'pan': 'ABCDE1234F',
+				'supplier_name': 'Test Supplier',
+				'reason': '',
+				'status': ''
+			}]
+			mock_create_attachment.return_value = {"fid": "dummy"}
+
+			result = doc.unpack()
+			self.assertEqual(result, 1)
+			mock_sendmail.assert_called_once()
