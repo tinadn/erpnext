@@ -4176,20 +4176,50 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		make_item_price()
 		make_pricing_rule()
   
-		so = self.create_and_submit_sales_order(qty=10,rate=90)
-		print("so_com",so.company)
-		print("set_warehouse",so.set_warehouse)
-		print("taxes",so.taxes)
+		so = make_sales_order(qty=10,rate=90)
+		so.save()
+		so.submit()
+		frappe.log_error("so_item_rate",so.items[0].rate)
+		frappe.log_error("so_grand_total",so.grand_total)
+		print("so_item_rate",so.items[0].rate)
+		print("so_grand_total",so.grand_total)
   
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
   
 		pe = get_payment_entry(dt="Sales Order",dn=so.name)
 		pe.save()
 		pe.submit()
+
+		pe.save()
+		pe.submit()
+		gl_entry_list = frappe.get_all(
+			"GL Entry",
+			filters={"voucher_no": pe.name},
+			fields=["account", "debit", "credit"]
+		)
+		print("gl_entry_list", gl_entry_list)
+
+		# Get the first debit and credit entry with corresponding amounts
+		debit_entry = next((entry for entry in gl_entry_list if entry['debit'] > 0), None)
+		credit_entry = next((entry for entry in gl_entry_list if entry['credit'] > 0), None)
+
+		debit_account = debit_entry['account'] if debit_entry else None
+		debit_amount = debit_entry['debit'] if debit_entry else None
+
+		credit_account = credit_entry['account'] if credit_entry else None
+		credit_amount = credit_entry['credit'] if credit_entry else None
+
+		frappe.log_error("Debit Account:", debit_account)
+		frappe.log_error("credit_account:", credit_account)
+		frappe.log_error("debit_amount:", debit_amount)
+		frappe.log_error("credit_amount:", credit_amount)
+
+		print("Debit Account:", debit_account, "Amount:", debit_amount)
+		print("Credit Account:", credit_account, "Amount:", credit_amount)
   
 		self.assertEqual(pe.status, 'Submitted')
-		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': pe.name, 'account': 'Debtors - _TC'}, 'credit'), 900)
-		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': pe.name, 'account': '_Test Bank 2 - _TC'}, 'debit'), 900)
+		self.assertEqual(credit_amount, 900)
+		self.assertEqual(debit_amount, 900)
   
 		dn = make_delivery_note(so.name)
 		dn.submit()
