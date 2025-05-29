@@ -4177,6 +4177,9 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 		make_pricing_rule()
   
 		so = self.create_and_submit_sales_order(qty=10,rate=90)
+		print("so_com",so.company)
+		print("set_warehouse",so.set_warehouse)
+		print("taxes",so.taxes)
   
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
   
@@ -4186,7 +4189,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
   
 		self.assertEqual(pe.status, 'Submitted')
 		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': pe.name, 'account': 'Debtors - _TC'}, 'credit'), 900)
-		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': pe.name, 'account': 'Cash - _TC'}, 'debit'), 900)
+		self.assertEqual(frappe.db.get_value('GL Entry', {'voucher_no': pe.name, 'account': '_Test Bank 2 - _TC'}, 'debit'), 900)
   
 		dn = make_delivery_note(so.name)
 		dn.submit()
