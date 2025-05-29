@@ -41,5 +41,46 @@ class TestStockLedgerReport(FrappeTestCase):
 		data = report.get_data(filters=self.filters)
 		serial_nos = [item for item in data[-1][-1]["balance_serial_no"].split("\n")]
 
-		# Test 2: Since we have created a delivery note of 5 qty, we should have 5 serial nos
+	def test_available_serial_no_with_include_uom(self):
+		self.filters.include_uom = 1
+
+		columns, data = execute(filters=self.filters)
+
+		uom_column_found = any("UOM" in col.get("label", "") if isinstance(col, dict) else "UOM" in str(col) for col in columns)
+		self.assertTrue(uom_column_found)
+
+	def test_report_skips_items_with_no_serial_nos(self):
+		item = create_item("_Test Item No Serial", is_stock_item=1)
+		item.has_serial_no = 0
+		item.save(ignore_permissions=True)
+
+		make_purchase_receipt(qty=3, item_code="_Test Item No Serial")
+
+		filters = frappe._dict(
+			company="_Test Company",
+			from_date=today(),
+			to_date=add_days(today(), 30),
+			item_code="_Test Item No Serial",
+		)
+
+		report = frappe.get_doc("Report", "Available Serial No")
+		columns, data = report.get_data(filters=filters)
+
+		for row in data:
+			self.assertTrue(
+				not row.get("serial_no") and not row.get("balance_serial_no"),
+				msg="Data returned for item without serial nos has serial numbers"
+			)
+
+
+	def test_no_rows_returned_if_no_balance_serials(self):
+
+		report = frappe.get_doc("Report", "Available Serial No")
+		columns, data = report.get_data(filters=self.filters)
+
+		rows_with_serials = [row for row in data if row.get("balance_serial_no")]
+		self.assertEqual(len(rows_with_serials), 0)
+
+
+
 		self.assertEqual(len(serial_nos), 5)
