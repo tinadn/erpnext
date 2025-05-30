@@ -5991,10 +5991,27 @@ class TestSalesInvoice(FrappeTestCase):
     	)
 		self.assertEqual(shipping_rule.docstatus, 1)
 		make_stock_entry(item_code="_Test Item 1", qty=10, rate=500, target="_Test Warehouse - _TC")
-		si = create_sales_invoice(qty=5,rate=200, do_not_submit=True)
+		si = create_sales_invoice(
+			do_not_submit=True,
+			do_not_save=True,
+			item_list=[
+				{
+					"item_code": "_Test Item 1",
+					"qty": 5,
+					"rate": 200,
+					"warehouse": "_Test Warehouse - _TC",
+					"income_account": "Sales - _TC",
+					"cost_center": "_Test Cost Center - _TC",
+					"deferred_revenue_account": "Deferred Revenue - _TC",
+				}
+			]
+		)
+		si.set_missing_values()
+		si.calculate_taxes_and_totals()
 		si.shipping_rule = shipping_rule.name
-		si.save()
+		si.insert()
 		si.submit()
+
 		self.assertEqual(si.net_total, 1000)
 		self.assertEqual(si.total_taxes_and_charges, 100)
 		self.assertEqual(si.grand_total, 1100)

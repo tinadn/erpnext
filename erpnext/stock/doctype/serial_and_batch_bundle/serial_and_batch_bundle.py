@@ -22,7 +22,7 @@ from frappe.utils import (
 	today,
 )
 from frappe.utils.csvutils import build_csv_response
-
+from frappe.model.naming import make_autoname
 from erpnext.stock.serial_batch_bundle import (
 	BatchNoValuation,
 	SerialNoValuation,
