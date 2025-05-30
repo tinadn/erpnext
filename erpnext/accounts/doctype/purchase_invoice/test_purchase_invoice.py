@@ -3330,8 +3330,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		pe.save()
 		pe.reload()
 		pe.submit()
-		pi_status_after = frappe.db.get_value("Purchase Invoice", pi.name, "status")
-		self.assertEqual(pi_status_after, "Paid")
+		self.assertEqual(pi.status, "Paid")
 
 		return_pi = make_debit_note(pi.name)
 		return_pi.update_outstanding_for_self = 0
