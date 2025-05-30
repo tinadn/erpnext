@@ -3,7 +3,7 @@
 
 
 # import frappe
-from frappe.model.document import Document
+from frappe.model.document import Document # pragma: no cover
 
 
 class QualityInspectionParameterGroup(Document): # pragma: no cover

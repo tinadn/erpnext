@@ -4,11 +4,35 @@
 import unittest
 
 import frappe
-
+from datetime import timedelta
+from frappe.utils import now_datetime
 from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import get_recipients
 
 
 class TestStockRepostingSettings(unittest.TestCase):
+	def tearDown(self):
+		frappe.db.rollback()
+	
+	# codecov
+	def test_convert_to_item_wh_reposting_TC_SCK_315(self):
+		start_dt = now_datetime()
+		end_dt = start_dt + timedelta(hours=1)
+
+		start_time = start_dt.time().strftime("%H:%M:%S")
+		end_time = end_dt.time().strftime("%H:%M:%S")
+
+		stock_reposting_setting = frappe.get_doc({
+			"doctype": "Stock Reposting Settings",
+			"limit_reposting_timeslot": 1,
+			"start_time": start_time,  # string like '15:04:52'
+			"end_time": end_time,      # string like '16:04:52'
+			"limits_dont_apply_on": "Sunday",
+			"item_based_reposting": 1,
+			"do_reposting_for_each_stock_transaction": 1
+		}).insert()
+
+		stock_reposting_setting.convert_to_item_wh_reposting()
+
 	def test_notify_reposting_error_to_role(self):
 		role = "Notify Reposting Role"
 
