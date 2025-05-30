@@ -15,6 +15,8 @@ from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 
 class TestPricingRule(FrappeTestCase):
 	def setUp(self):
+		if frappe.db.get_single_value("Selling Settings", "validate_selling_price"):
+			frappe.db.set_single_value("Selling Settings", "validate_selling_price", 0)
 		delete_existing_pricing_rules()
 		if "custom_crm" in frappe.get_installed_apps():
 			setup_pricing_rule_data()
@@ -28,6 +30,8 @@ class TestPricingRule(FrappeTestCase):
 
 	def tearDown(self):
 		delete_existing_pricing_rules()
+		if frappe.db.get_single_value("Selling Settings", "validate_selling_price"):
+			frappe.db.set_single_value("Selling Settings", "validate_selling_price", 0)
 
 	def test_pricing_rule_for_discount(self):
 		from frappe import MandatoryError
@@ -435,52 +439,52 @@ class TestPricingRule(FrappeTestCase):
 		self.assertEqual(so.items[1].item_code, "_Test Item 2")
 
 	def test_enforce_free_item_qty(self):
- 		# this test is only for testing non-enforcement as all other tests in this file already test with enforcement
- 		frappe.delete_doc_if_exists("Pricing Rule", "_Test Pricing Rule")
- 		test_record = {
- 			"doctype": "Pricing Rule",
- 			"title": "_Test Pricing Rule",
- 			"apply_on": "Item Code",
- 			"currency": "USD",
- 			"items": [
- 				{
- 					"item_code": "_Test Item",
- 				}
- 			],
- 			"selling": 1,
- 			"rate_or_discount": "Discount Percentage",
- 			"rate": 0,
- 			"min_qty": 0,
- 			"max_qty": 7,
- 			"discount_percentage": 17.5,
- 			"price_or_product_discount": "Product",
- 			"same_item": 0,
- 			"free_item": "_Test Item 2",
- 			"free_qty": 1,
- 			"company": "_Test Company",
- 		}
- 		pricing_rule = frappe.get_doc(test_record.copy()).insert()
- 
- 		# With enforcement
- 		so = make_sales_order(item_code="_Test Item", qty=1, do_not_submit=True)
- 		self.assertEqual(so.items[1].is_free_item, 1)
- 		self.assertEqual(so.items[1].item_code, "_Test Item 2")
- 
- 		# Test 1 : Saving a document with an item with pricing list without it's corresponding free item will cause it the free item to be refetched on save
- 		so.items.pop(1)
- 		so.save()
- 		so.reload()
- 		self.assertEqual(len(so.items), 2)
- 
- 		# Without enforcement
- 		pricing_rule.enforce_free_item_qty = 0
- 		pricing_rule.save()
- 
- 		# Test 2 : Deleted free item will not be fetched again on save without enfrocement
- 		so.items.pop(1)
- 		so.save()
- 		so.reload()
- 		self.assertEqual(len(so.items), 1)
+		# this test is only for testing non-enforcement as all other tests in this file already test with enforcement
+		frappe.delete_doc_if_exists("Pricing Rule", "_Test Pricing Rule")
+		test_record = {
+			"doctype": "Pricing Rule",
+			"title": "_Test Pricing Rule",
+			"apply_on": "Item Code",
+			"currency": "USD",
+			"items": [
+				{
+					"item_code": "_Test Item",
+				}
+			],
+			"selling": 1,
+			"rate_or_discount": "Discount Percentage",
+			"rate": 0,
+			"min_qty": 0,
+			"max_qty": 7,
+			"discount_percentage": 17.5,
+			"price_or_product_discount": "Product",
+			"same_item": 0,
+			"free_item": "_Test Item 2",
+			"free_qty": 1,
+			"company": "_Test Company",
+		}
+		pricing_rule = frappe.get_doc(test_record.copy()).insert()
+
+		# With enforcement
+		so = make_sales_order(item_code="_Test Item", qty=1, do_not_submit=True)
+		self.assertEqual(so.items[1].is_free_item, 1)
+		self.assertEqual(so.items[1].item_code, "_Test Item 2")
+
+		# Test 1 : Saving a document with an item with pricing list without it's corresponding free item will cause it the free item to be refetched on save
+		so.items.pop(1)
+		so.save()
+		so.reload()
+		self.assertEqual(len(so.items), 2)
+
+		# Without enforcement
+		pricing_rule.enforce_free_item_qty = 0
+		pricing_rule.save()
+
+		# Test 2 : Deleted free item will not be fetched again on save without enfrocement
+		so.items.pop(1)
+		so.save()
+		so.reload()
+		self.assertEqual(len(so.items), 1)
 
 	def test_dont_enforce_free_item_qty(self):
 		# this test is only for testing non-enforcement as all other tests in this file already test with enforcement
