@@ -3307,8 +3307,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		pi.save()
 		pi.reload()
 		pi.submit()
-		pi_status_before = frappe.db.get_value("Purchase Invoice", pi.name, "status")
-		self.assertEqual(pi_status_before, "Unpaid")
+		self.assertEqual(pi.status, "Unpaid")
 
 
 		payment_term = None
@@ -3405,9 +3404,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		pe.append("references", {"reference_doctype": "Purchase Invoice", "reference_name": pi.name,"allocated_amount":pr.grand_total})
 		pe.save()
 		pe.submit()
-
-		pi_status = frappe.db.get_value("Purchase Invoice", pi.name, "status")
-		self.assertEqual(pi_status, "Partly Paid")
+		self.assertEqual(pi.status, "Partly Paid")
 		
 	def test_material_transfer_between_branch_TC_B_149(self):
 		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_company_and_supplier
