@@ -5728,7 +5728,7 @@ class TestSalesInvoice(FrappeTestCase):
 		]
 		check_gl_entries(self, jv_doc.name, expected_gl_entries, jv_doc.posting_date, "Journal Entry")
 	
-	@change_settings("Selling Settings",{"validate_selling_price":1})
+
 	def test_prevent_sale_below_purchase_rate_TC_ACC_125(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
 			create_purchase_invoice,
@@ -5740,6 +5740,9 @@ class TestSalesInvoice(FrappeTestCase):
 		import frappe
 
 		get_or_create_fiscal_year("_Test Company")
+
+		if not frappe.db.get_single_value("Selling Settings", "validate_selling_price"):
+			frappe.db.set_single_value("Selling Settings", "validate_selling_price", 1)
 
 		if not frappe.db.get_value("Company","_Test Company","stock_received_but_not_billed"):
 			frappe.db.set_value("Company","_Test Company","stock_received_but_not_billed","Stock Received But Not Billed - _TC")
@@ -5773,9 +5776,10 @@ class TestSalesInvoice(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError) as context:
 			si.save()
 		self.assertEqual(str(context.exception), expected_msg)
-		frappe.clear_cache(doctype="Selling Settings")
+
+		frappe.db.set_single_value("Selling Settings", "validate_selling_price", 0)
 	
-	@change_settings("Selling Settings",{"validate_selling_price":0})
+
 	def test_test_unlink_payment_on_invoice_cancellation_TC_ACC_126(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
 			make_test_item
@@ -5806,8 +5810,7 @@ class TestSalesInvoice(FrappeTestCase):
 		except Exception as e:
 			error_msg = str(e)
 			self.assertEqual(error_msg,f'Cannot delete or cancel because Sales Invoice {si_name} is linked with Payment Entry {pe_name} at Row: 1')
-		finally:
-			frappe.clear_cache(doctype="Selling Settings")
+
 
 	def test_si_cancel_amend_with_item_details_change_TC_S_128(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import (
