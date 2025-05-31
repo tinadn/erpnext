@@ -3,10 +3,15 @@
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
-from erpnext.setup.doctype.company.test_company import create_child_company
+
 from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+from erpnext.setup.doctype.company.test_company import create_child_company
+
 
 class TestClosingStockBalance(FrappeTestCase):
+	def tearDown(self):
+		frappe.db.rollback()
+
 	# codecov
 	def test_set_status_TC_SCK_292(self):
 		item_code = "Test Item"
@@ -17,45 +22,45 @@ class TestClosingStockBalance(FrappeTestCase):
 			create_child_company()
 
 		if not frappe.db.exists("Item", item_code):
-				item = make_test_item(item_code)
-				item.is_stock_item = 0
-				item.save()
+			item = make_test_item(item_code)
+			item.is_stock_item = 0
+			item.save()
 
 		warehouse = frappe.get_doc(
 			{
-				"doctype":"Warehouse",
-				"warehouse_name":warehouse,
-				"parent_warehouse":"All Warehouses - _TIRC",
-				"company":company
+				"doctype": "Warehouse",
+				"warehouse_name": warehouse,
+				"parent_warehouse": "All Warehouses - _TIRC",
+				"company": company,
 			}
 		).insert(ignore_permissions=True)
 
 		closing_balance = frappe.get_doc(
 			{
-			"doctype":"Closing Stock Balance",
-			"naming_series":"CBAL-.#####",
-			"company": company,
-			"status":"Draft",
-			"item_code":item,
-			"include_uom":"Box",
-			"warehouse":warehouse,
-			"item_group":"All Item Groups",
-			"warehouse_type":"Transit"
+				"doctype": "Closing Stock Balance",
+				"naming_series": "CBAL-.#####",
+				"company": company,
+				"status": "Draft",
+				"item_code": item,
+				"include_uom": "Box",
+				"warehouse": warehouse,
+				"item_group": "All Item Groups",
+				"warehouse_type": "Transit",
 			}
 		).insert(ignore_permissions=True)
 		closing_balance.submit()
 
 		closing_balance = frappe.get_doc(
 			{
-			"doctype":"Closing Stock Balance",
-			"naming_series":"CBAL-.#####",
-			"company": company,
-			"status":"Draft",
-			"item_code":item,
-			"include_uom":"Box",
-			"warehouse":warehouse,
-			"item_group":"All Item Groups",
-			"warehouse_type":"Transit"
+				"doctype": "Closing Stock Balance",
+				"naming_series": "CBAL-.#####",
+				"company": company,
+				"status": "Draft",
+				"item_code": item,
+				"include_uom": "Box",
+				"warehouse": warehouse,
+				"item_group": "All Item Groups",
+				"warehouse_type": "Transit",
 			}
 		).insert(ignore_permissions=True)
 		closing_balance.submit()
@@ -63,7 +68,6 @@ class TestClosingStockBalance(FrappeTestCase):
 		# Assert that the Closing Stock Balance was submitted
 		self.assertEqual(closing_balance.docstatus, 1, "Closing Stock Balance should be submitted.")
 		closing_balance.cancel()
-
 
 		# Assert that the document is now cancelled
 		self.assertEqual(closing_balance.docstatus, 2, "Closing Stock Balance should be cancelled.")
