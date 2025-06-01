@@ -1,4 +1,5 @@
 import unittest
+from frappe.tests.utils import FrappeTestCase
 from unittest.mock import patch, MagicMock
 from datetime import date
 import types
@@ -7,7 +8,7 @@ import frappe
 import available_batch_report  # assuming your file is named available_batch_report.py
 
 
-class TestAvailableBatchReport(unittest.TestCase):
+class TestAvailableBatchReport(FrappeTestCase):
     def setUp(self):
         # Setup common filters
         self.filters = types.SimpleNamespace(
