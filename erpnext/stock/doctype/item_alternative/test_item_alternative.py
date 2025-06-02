@@ -38,39 +38,16 @@ class TestItemAlternative(FrappeTestCase):
 		if not frappe.db.exists("Item", item_code):
 			item_create = make_test_item(item_code)
 
-		with self.assertRaises(frappe.exceptions.ValidationError): frappe.get_doc({
+		with self.assertRaises(frappe.exceptions.ValidationError) as context: frappe.get_doc({
 		"doctype": "Item Alternative",
 		"item_code": item_code,
 		"alternative_item_code": item_code,
 		"two_way": 1
 		}).insert()
+		self.assertIn("Not allow to set alternative item for the item Test Item", str(context.exception))
 			
 	# codecov		
 	def test_get_alternative_items_TC_SCK_317(self):
-		item1 = "Test Item1"
-		item2 = "Test Item2"
-		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
-
-		if not frappe.db.exists("Item",item1):
-			item_create1 = make_test_item(item1)
-			item_create1.allow_alternative_item = 1
-			item_create1.save()
-		
-		if not frappe.db.exists("Item",item2):
-			item_create2 = make_test_item(item2)
-			item_create2.allow_alternative_item = 1
-			item_create2.save()
-	
-
-		frappe.get_doc({
-			"doctype": "Item Alternative",
-			"item_code": item1,
-			"alternative_item_code":item2,
-			"two_way": 1
-		}).insert()
-
-	# codecov		
-	def test_get_alternative_items_TC_SCK_318(self):
 		item1 = "Test Item1"
 		item2 = "Test Item2"
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
@@ -86,12 +63,30 @@ class TestItemAlternative(FrappeTestCase):
 			item_create2.save()
 	
 
-		with self.assertRaises(frappe.exceptions.ValidationError): frappe.get_doc({
+		with self.assertRaises(frappe.exceptions.ValidationError) as context:frappe.get_doc({
 			"doctype": "Item Alternative",
 			"item_code": item1,
 			"alternative_item_code":item2,
 			"two_way": 1
 		}).insert()
+		self.assertIn("Allow Alternative Item must be checked on Item Test Item2", str(context.exception))
+		
+	# codecov		
+	def test_get_alternative_items_TC_SCK_318(self):
+		item_code = "Test Item"
+		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
+		if not frappe.db.exists("Item", item_code):
+			item_create = make_test_item(item_code)
+			item_create.allow_alternative_item=1
+			item_create.save()
+
+		with self.assertRaises(frappe.exceptions.ValidationError) as context: frappe.get_doc({
+		"doctype": "Item Alternative",
+		"item_code": item_code,
+		"alternative_item_code": item_code,
+		"two_way": 1
+		}).insert()
+		self.assertIn("Alternative item must not be same as item code", str(context.exception))
 			
 		
 	def test_alternative_item_for_subcontract_rm(self):
