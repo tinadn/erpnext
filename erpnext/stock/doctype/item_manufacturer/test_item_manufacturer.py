@@ -27,16 +27,10 @@ class TestItemManufacturer(unittest.TestCase):
 			}
 		).insert()
 
-		if not frappe.db.exists("Item", item_code):
-			item_create = make_test_item(item_code)
-			item_create.default_item_manufacturer = manufacturer_doc.name
-			item_create.default_manufacturer_part_no = "001"
-			item_create.save()
-		else:
-			item_create = frappe.get_doc("Item", item_code)
-			item_create.default_item_manufacturer = manufacturer_doc.name
-			item_create.default_manufacturer_part_no = "001"
-			item_create.save()
+		item_create = make_test_item(item_code)
+		item_create.default_item_manufacturer = manufacturer_doc.name
+		item_create.default_manufacturer_part_no = "001"
+		item_create.save()
 
 		item_manufacturer_doc = frappe.get_doc(
 			{
@@ -64,16 +58,10 @@ class TestItemManufacturer(unittest.TestCase):
 			}
 		).insert()
 
-		if not frappe.db.exists("Item", item_code):
-			item_create = make_test_item(item_code)
-			item_create.default_item_manufacturer = manufacturer_doc.name
-			item_create.default_manufacturer_part_no = "001"
-			item_create.save()
-		else:
-			item_create = frappe.get_doc("Item", item_code)
-			item_create.default_item_manufacturer = manufacturer_doc.name
-			item_create.default_manufacturer_part_no = "001"
-			item_create.save()
+		item_create = make_test_item(item_code)
+		item_create.default_item_manufacturer = manufacturer_doc.name
+		item_create.default_manufacturer_part_no = "001"
+		item_create.save()
 
 		item_manufacturer_doc = frappe.get_doc(
 			{
