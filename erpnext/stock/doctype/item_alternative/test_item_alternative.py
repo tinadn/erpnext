@@ -62,15 +62,15 @@ class TestItemAlternative(FrappeTestCase):
 		item2 = "Test Item2"
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
 
-		if not frappe.db.exists("Item", item1):
-			item_create1 = make_test_item(item1)
-			item_create1.allow_alternative_item = 1
-			item_create1.save()
+		# item1 creation
+		item_create1 = make_test_item(item1)
+		item_create1.allow_alternative_item = 1
+		item_create1.save()
 
-		if not frappe.db.exists("Item", item2):
-			item_create2 = make_test_item(item2)
-			item_create2.allow_alternative_item = 0
-			item_create2.save()
+		# item2 creation
+		item_create2 = make_test_item(item2)
+		item_create2.allow_alternative_item = 0
+		item_create2.save()
 
 		item_alternative = frappe.get_doc(
 			{
@@ -91,10 +91,9 @@ class TestItemAlternative(FrappeTestCase):
 		item_code = "Test Item"
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
 
-		if not frappe.db.exists("Item", item_code):
-			item_create = make_test_item(item_code)
-			item_create.allow_alternative_item = 1
-			item_create.save()
+		item_create = make_test_item(item_code)
+		item_create.allow_alternative_item = 1
+		item_create.save()
 
 		item_alternative = frappe.get_doc(
 			{
