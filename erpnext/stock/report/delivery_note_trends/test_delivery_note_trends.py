@@ -2,9 +2,59 @@ import unittest
 import frappe
 from frappe.utils import today, add_days
 from erpnext.stock.report.delivery_note_trends.delivery_note_trends import execute, get_chart_data
-
+from erpnext.stock.doctype.item.test_item import create_item
 
 class TestDeliveryNoteTrendsReport(unittest.TestCase):
+	def setUp(self):
+        super().setUp()
+        customer = frappe.get_doc({
+		"doctype": "Customer",
+		"customer_name": "_Test Customer DN",
+		"customer_type": "Individual"
+        }).insert(ignore_permissions=True)
+
+        item = create_item(f"_Test Item DN", {
+                "is_stock_item": 1,
+                "stock_uom": "Nos"
+            })
+
+        self.dn = frappe.get_doc({
+            "doctype": "Delivery Note",
+            "customer": customer.name,
+            "posting_date": today(),
+            "company": frappe.defaults.get_user_default("Company"),
+            "items": [{
+                "item_code": item.name,
+                "qty": 1,
+                "rate": 100,
+                "warehouse": frappe.defaults.get_user_default("Warehouse")
+            }]
+        }).insert(ignore_permissions=True)
+        self.dn.submit()
+
+    def test_execute_with_valid_filters(self):
+        from erpnext.stock.report.delivery_note_trends import delivery_note_trends
+        from frappe import _dict
+
+        fiscal_year = frappe.defaults.get_user_default("fiscal_year") or "2024-2025"
+
+        filters = _dict({
+            "value_quantity": "Value",
+            "period": "Monthly",
+            "based_on": "Customer",
+            "group_by": "Item",
+            "company": frappe.defaults.get_user_default("company"),
+            "from_date": add_days(today(), -30),
+            "to_date": today(),
+            "fiscal_year": fiscal_year
+        })
+
+        columns, data, _, chart_data = delivery_note_trends.execute(filters)
+
+        self.assertTrue(columns)
+        self.assertTrue(data)
+        self.assertTrue(chart_data)
+
     def test_execute_with_fiscal_year_filter(self):
         filters = frappe._dict({
             "company": "_Test Company",
