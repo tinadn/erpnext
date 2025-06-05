@@ -24,7 +24,6 @@ from frappe.utils import (
 import erpnext
 from erpnext.accounts.general_ledger import process_gl_map
 from erpnext.buying.utils import check_on_hold_or_closed_status
-from erpnext.controllers.accounts_controller import InvalidQtyError
 from erpnext.controllers.taxes_and_totals import init_landed_taxes_and_totals
 from erpnext.manufacturing.doctype.bom.bom import (
 	add_additional_cost,

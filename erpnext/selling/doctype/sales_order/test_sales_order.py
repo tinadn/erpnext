@@ -11,7 +11,7 @@ from frappe.tests.utils import FrappeTestCase, change_settings, if_app_installed
 from frappe.utils import add_days, flt, getdate, nowdate, today
 from erpnext.stock.get_item_details import get_bin_details
 from erpnext.accounts.test.accounts_mixin import AccountsTestMixin
-from erpnext.controllers.accounts_controller import update_child_qty_rate, InvalidQtyError
+from erpnext.controllers.accounts_controller import InvalidQtyError
 from erpnext.maintenance.doctype.maintenance_schedule.test_maintenance_schedule import (
 	make_maintenance_schedule,
 )
