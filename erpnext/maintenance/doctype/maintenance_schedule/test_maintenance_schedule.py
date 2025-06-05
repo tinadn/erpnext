@@ -215,7 +215,7 @@ class TestMaintenanceSchedule(unittest.TestCase):
 		ms.append("items", {})
 		assert_throw(ms, "Please select item code")
 
-		ms.items[0].item_code = "_Test Item"
+		ms.items[0].item_code = self.item.name
 		assert_throw(ms, "Start Date and End Date")
 
 		ms.items[0].start_date = "2025-01-01"
@@ -251,11 +251,6 @@ class TestMaintenanceSchedule(unittest.TestCase):
 			ms_new.validate_sales_order()
 
 	def test_validate_serial_no_bundle_throw_TC_M_004(self):
-		from erpnext.stock.doctype.item.test_item import make_item
-
-		item_code = "_Test Item 1"
-		item_code = make_item(item_code, {"has_serial_no": 1, "is_stock_item": 1}).name
-
 		bundle = frappe.get_doc(
 			{
 				"doctype": "Serial and Batch Bundle",
@@ -310,14 +305,11 @@ class TestMaintenanceSchedule(unittest.TestCase):
 		self.assertFalse(frappe.db.exists("Event", event.name))
 
 	def test_validate_serial_no_wrong_item_TC_M_006(self):
-		from erpnext.stock.doctype.item.test_item import make_item
-
-		item = make_item("_Test Item 1", {"has_serial_no": 1})
 		sr = (
 			frappe.get_doc("Serial No", "_Test Serial No")
 			if frappe.db.exists("Serial No", "_Test Serial No")
 			else frappe.get_doc(
-				{"doctype": "Serial No", "serial_no": "_Test Serial No", "item_code": item.name}
+				{"doctype": "Serial No", "serial_no": "_Test Serial No", "item_code": self.item.name}
 			).insert()
 		)
 
