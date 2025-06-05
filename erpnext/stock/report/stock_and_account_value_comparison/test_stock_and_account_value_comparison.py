@@ -11,6 +11,7 @@ from erpnext.stock.report.stock_and_account_value_comparison.stock_and_account_v
 from frappe.utils import nowdate, now_datetime
 
 
+
 class TestStockAndAccountValueComparison(FrappeTestCase):
     def setUp(self):
         self.company = "_Test Company"
