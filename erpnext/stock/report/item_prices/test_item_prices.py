@@ -23,7 +23,7 @@ class TestItemPrices(FrappeTestCase):
 			item.insert(ignore_permissions=True, ignore_if_duplicate=True)
 			self.test_items.append(item.name)
 
-	def test_execute_no_filters(self):
+	def test_execute_no_filters_T_IP_001(self):
 		item_prices.get_item_details = lambda filters: {
 			self.test_items[0]: {
 				"item_name": "Test Item Name 1",
@@ -42,19 +42,19 @@ class TestItemPrices(FrappeTestCase):
 		self.assertTrue(columns, "Report should return columns.")
 		self.assertEqual(data[0][0], self.test_items[0], "First item's code should match the test item.")
 
-	def test_get_item_details_enabled(self):
+	def test_get_item_details_enabled_T_IP_002(self):
 		filters = {"items": "Enabled Items only"}
 		result = item_prices.get_item_details(filters)
 		self.assertIn(self.test_items[0], result)
 		self.assertNotIn(self.test_items[1], result)
 
-	def test_get_item_details_disabled(self):
+	def test_get_item_details_disabled_T_IP_003(self):
 		filters = {"items": "Disabled Items only"}
 		result = item_prices.get_item_details(filters)
 		self.assertIn(self.test_items[1], result)
 		self.assertNotIn(self.test_items[0], result)
 
-	def test_get_price_list(self):
+	def test_get_price_list_T_IP_004(self):
 		if not frappe.db.exists("Currency", "INR"):
 			frappe.get_doc({"doctype": "Currency", "name": "INR", "symbol": "₹"}).insert(
 				ignore_permissions=True, ignore_if_duplicate=True
@@ -87,7 +87,7 @@ class TestItemPrices(FrappeTestCase):
 		self.assertIn("Buying", result[self.test_items[0]])
 		self.assertIn("₹ 500.0", result[self.test_items[0]]["Buying"])
 
-	def test_get_valuation_rate(self):
+	def test_get_valuation_rate_T_IP_005(self):
 		frappe.get_doc(
 			{
 				"doctype": "Bin",
@@ -102,7 +102,7 @@ class TestItemPrices(FrappeTestCase):
 		self.assertIn(self.test_items[0], result)
 		self.assertEqual(result[self.test_items[0]], 50)
 
-	def test_get_last_purchase_rate(self):
+	def test_get_last_purchase_rate_T_IP_006(self):
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 
 		supplier = frappe.get_doc({"doctype": "Supplier", "supplier_name": "Test Supplier"}).insert(
