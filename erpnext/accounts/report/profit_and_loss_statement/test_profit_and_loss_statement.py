@@ -57,7 +57,7 @@ class TestProfitAndLossStatement(AccountsTestMixin, FrappeTestCase):
 			period_end_date=fy.year_end_date,
 			filter_based_on="Fiscal Year",
 			periodicity="Monthly",
-			accumulated_vallues=True,
+			accumulated_values=True,
 		)
 
 	def test_profit_and_loss_output_and_summary(self):
