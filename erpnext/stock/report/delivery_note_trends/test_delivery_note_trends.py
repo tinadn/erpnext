@@ -30,14 +30,14 @@ class TestDeliveryNoteTrendsReport(unittest.TestCase):
             }]
         }).insert(ignore_permissions=True)
 		self.dn.submit()
-
-    def test_execute_with_valid_filters(self):
-        from erpnext.stock.report.delivery_note_trends import delivery_note_trends
-        from frappe import _dict
-
-        fiscal_year = frappe.defaults.get_user_default("fiscal_year") or "2024-2025"
-
-        filters = _dict({
+		
+	def test_execute_with_valid_filters(self):
+		from erpnext.stock.report.delivery_note_trends import delivery_note_trends
+		from frappe import _dict
+		
+		fiscal_year = frappe.defaults.get_user_default("fiscal_year") or "2024-2025"
+		
+		filters = _dict({
             "value_quantity": "Value",
             "period": "Monthly",
             "based_on": "Customer",
@@ -47,12 +47,11 @@ class TestDeliveryNoteTrendsReport(unittest.TestCase):
             "to_date": today(),
             "fiscal_year": fiscal_year
         })
-
-        columns, data, _, chart_data = delivery_note_trends.execute(filters)
-
-        self.assertTrue(columns)
-        self.assertTrue(data)
-        self.assertTrue(chart_data)
+		
+		columns, data, _, chart_data = delivery_note_trends.execute(filters)
+		self.assertTrue(columns)
+		self.assertTrue(data)
+		self.assertTrue(chart_data)
 
     def test_execute_with_fiscal_year_filter(self):
         filters = frappe._dict({
