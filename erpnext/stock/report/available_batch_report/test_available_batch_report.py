@@ -2,6 +2,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 from erpnext.stock.report.available_batch_report import available_batch_report
 from types import SimpleNamespace
+from frappe.utils import today
 
 
 class TestAvailableBatchReport(FrappeTestCase):
@@ -131,6 +132,54 @@ class TestAvailableBatchReport(FrappeTestCase):
 		columns = available_batch_report.get_columns(filters)
 		fieldnames = [col["fieldname"] for col in columns]
 		self.assertNotIn("item_name", fieldnames)
+
+
+	def test_to_date_today_with_expiry_check(self):
+		# Ensure the batch has a valid expiry date in the future
+		self.batch.expiry_date = today()
+		self.batch.reload()
+		self.batch.save()
+		
+
+		filters = self.make_filters(
+			to_date=today(),
+			item_code=self.item.name
+		)
+		data = available_batch_report.get_data(filters)
+		self.assertIsInstance(data, list)
+
+	def test_to_date_today_with_expired_batches_included(self):
+		# Expired batch with include_expired_batches=True
+		self.batch.expiry_date = "2000-01-01"
+		self.batch.reload()
+		self.batch.save()
+
+		filters = self.make_filters(
+			to_date=today(),
+			item_code=self.item.name,
+			include_expired_batches=True
+		)
+		data = available_batch_report.get_data(filters)
+		self.assertIsInstance(data, list)
+
+	def test_filter_by_warehouse_type(self):
+		# Add warehouse_type and filter by it
+		if not frappe.db.exists("Warehouse Type", "Raw Material"):
+			frappe.get_doc({
+				"doctype": "Warehouse Type",
+				"name": "Raw Material",
+				"warehouse_type": "Raw Material"
+			}).insert()
+		warehouse_type = "Raw Material"
+		self.warehouse.warehouse_type = warehouse_type
+		self.warehouse.is_group = 0
+		self.warehouse.save()
+
+		filters = self.make_filters(
+			warehouse_type=warehouse_type
+		)
+		data = available_batch_report.get_data(filters)
+		self.assertIsInstance(data, list)
 
 
 def create_company(company_name):

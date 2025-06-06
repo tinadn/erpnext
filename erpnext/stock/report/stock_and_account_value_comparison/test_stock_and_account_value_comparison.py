@@ -222,6 +222,71 @@ class TestStockAndAccountValueComparison(FrappeTestCase):
             create_reposting_entries([row_dict], self.company)
             create_reposting_entries([row_dict], self.company)
             self.assertTrue(True)
+        
+    def test_create_reposting_entries_with_string_input(self):
+        filters = frappe._dict({
+            "company": self.company,
+            "as_on_date": self.posting_date
+        })
+        data = get_data(filters)
+        if data:
+            row = data[0]
+            row_dict = {
+                "voucher_type": row.voucher_type,
+                "voucher_no": row.voucher_no,
+                "posting_date": str(row.posting_date)
+            }
+            row_string = frappe.as_json([row_dict])
+            create_reposting_entries(row_string, self.company)
+            self.assertTrue(True)
+
+    def test_get_stock_ledger_data_posting_time_conversion(self):
+        filters = frappe._dict({
+            "company": self.company,
+            "as_on_date": self.posting_date,
+        })
+
+        sle_filters = {
+            "company": self.company,
+            "posting_date": self.posting_date,
+            "is_cancelled": 0
+        }
+
+        result = get_stock_ledger_data(filters, sle_filters)
+
+        self.assertTrue(result)
+        for row in result:
+            if row.get("voucher_no") == self.stock_entry:
+                self.assertIn("posting_time", row)
+                if row["posting_time"] is not None:
+                    self.assertIsInstance(row["posting_time"], timedelta)
+
+
+    def test_get_data_appends_when_difference_exceeds_threshold(self):
+        filters = frappe._dict({
+            "company": self.company,
+            "as_on_date": self.posting_date
+        })
+
+        # Modify GL Entry to force difference > 0.1
+        frappe.db.set_value(
+            "GL Entry",
+            {"voucher_no": self.stock_entry},
+            "debit_in_account_currency",
+            800  # lower than stock_value 1000
+        )
+
+        result = get_data(filters)
+        self.assertTrue(result)  # Should not be empty
+        self.assertGreater(len(result), 0)
+
+        for row in result:
+            self.assertIn("account_value", row)
+            self.assertIn("difference_value", row)
+            self.assertTrue(abs(row.difference_value) > 0.1)
+
+
+
 
 
 def get_or_create_fiscal_year(company):
