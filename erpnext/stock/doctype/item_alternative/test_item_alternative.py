@@ -42,19 +42,17 @@ class TestItemAlternative(FrappeTestCase):
 		if not frappe.db.exists("Item", item_code):
 			item_code = make_test_item(item_code)
 
-		item_alternative = frappe.get_doc(
-			{
-				"doctype": "Item Alternative",
-				"item_code": item_code,
-				"alternative_item_code": item_code,
-				"two_way": 1,
-			}
-		).insert()
-		self.assertRaises(
-			frappe.ValidationError,
-			item_alternative.insert,
-			msg="Not allow to set alternative item for the item Test Item",
-		)
+		with self.assertRaises(frappe.ValidationError) as context:
+			frappe.get_doc(
+				{
+					"doctype": "Item Alternative",
+					"item_code": item_code,
+					"alternative_item_code": item_code,
+					"two_way": 1,
+				}
+			).insert()
+
+		self.assertIn("Not allow to set alternative item for the item", str(context.exception))
 
 	# codecov
 	def test_get_alternative_items_TC_SCK_317(self):
@@ -72,19 +70,16 @@ class TestItemAlternative(FrappeTestCase):
 		item_create2.allow_alternative_item = 0
 		item_create2.save()
 
-		item_alternative = frappe.get_doc(
-			{
-				"doctype": "Item Alternative",
-				"item_code": item1,
-				"alternative_item_code": item2,
-				"two_way": 1,
-			}
-		).insert()
-		self.assertRaises(
-			frappe.ValidationError,
-			item_alternative.insert,
-			msg="Allow Alternative Item must be checked on Item Test Item2",
-		)
+		with self.assertRaises(frappe.ValidationError) as context:
+			frappe.get_doc(
+				{
+					"doctype": "Item Alternative",
+					"item_code": item1,
+					"alternative_item_code": item2,
+					"two_way": 1,
+				}
+			).insert()
+		self.assertIn("Allow Alternative Item must be checked on Item Test Item2", str(context.exception))
 
 	# codecov
 	def test_get_alternative_items_TC_SCK_318(self):
@@ -94,20 +89,16 @@ class TestItemAlternative(FrappeTestCase):
 		item_create = make_test_item(item_code)
 		item_create.allow_alternative_item = 1
 		item_create.save()
-
-		item_alternative = frappe.get_doc(
-			{
-				"doctype": "Item Alternative",
-				"item_code": item_code,
-				"alternative_item_code": item_code,
-				"two_way": 1,
-			}
-		).insert()
-		self.assertRaises(
-			frappe.ValidationError,
-			item_alternative.insert,
-			msg="Alternative item must not be same as item code",
-		)
+		with self.assertRaises(frappe.ValidationError) as context:
+			frappe.get_doc(
+				{
+					"doctype": "Item Alternative",
+					"item_code": item_code,
+					"alternative_item_code": item_code,
+					"two_way": 1,
+				}
+			).insert()
+		self.assertIn("Alternative item must not be same as item code", str(context.exception))
 
 	def test_alternative_item_for_subcontract_rm(self):
 		set_backflush_based_on("BOM")
