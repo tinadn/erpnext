@@ -300,6 +300,9 @@ class TestWarehouse(FrappeTestCase):
 			    "parent_warehouse": parent_warehouse_name,
 			    "account": erpnext.encode_company_abbr(account1, company)
 			}).insert()
+			
+		warehouse_doc = frappe.get_doc("Warehouse", test_warehouse_name)
+	
 
     	# Make sure the test item is stock item with valuation rate
 		item = frappe.get_doc("Item", "_Test Item")
