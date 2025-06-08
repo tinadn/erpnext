@@ -4,7 +4,7 @@ import frappe
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestTotalStockReport(FrappeTestCase):
+class TestTotalStockSummary(FrappeTestCase):
 	def setUp(self):
 
 		hsn_code = "10010010"
