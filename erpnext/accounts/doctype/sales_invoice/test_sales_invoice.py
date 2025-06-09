@@ -7608,15 +7608,29 @@ def add_taxes(doc):
 
 def create_customer(**args):
 	if not frappe.db.exists("Customer", args.get("customer_name")):
+		print("working", "working")
 		customer = frappe.new_doc("Customer")
 		customer.customer_name = args.get("customer_name")
 		customer.type = "Individual"
+
+		if args.get("company"):
+			# Set company in child table `companies`
+			customer.append("companies", {"company": args.get("company")})
 
 		if args.get("currency"):
 			customer.default_currency = args.get("currency")
 		if args.get("company") and args.get("account"):
 			customer.append("accounts", {"company": args.get("company"), "account": args.get("account")})
 		customer.save()
+	else:
+		customer = frappe.get_doc("Customer", args.get("customer_name"))
+
+		# Ensure the company isn't already in the child table
+		if args.get("company") and not any(c.company == args.get("company") for c in customer.companies):
+			customer.append("companies", {"company": args.get("company")})
+			customer.save()
+
+		return customer
 
 
 def create_accounts(**args):
