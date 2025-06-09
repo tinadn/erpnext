@@ -9,7 +9,14 @@ from frappe.tests.utils import FrappeTestCase
 
 
 class TestSupplierScorecardPeriod(FrappeTestCase):
-	def teardown():
+	def setUp(self):
+		supplier_records = create_supplier_related_records()
+		self.criteria = supplier_records.get("criteria")
+		self.scorecard_variable = supplier_records.get("scorecard_variable")
+		self.supplier_document = supplier_records.get("supplier_document")
+		self.scorecard = supplier_records.get("scorecard")
+
+	def teardown(self):
 		frappe.db.rollback()
 
 	def test_validate_method_TC_B_203(self):
@@ -272,56 +279,7 @@ class TestSupplierScorecardPeriod(FrappeTestCase):
 			make_supplier_scorecard,
 		)
 
-		if not frappe.db.exists("Supplier Scorecard Criteria", "_Test Criteria"):
-			criteria = frappe.get_doc(
-				{
-					"doctype": "Supplier Scorecard Criteria",
-					"max_score": "100",
-					"formula": "max(0,10)*100",
-					"criteria_name": "_Test Criteria",
-				}
-			).insert(ignore_permissions=True, ignore_if_duplicate=True)
-		else:
-			criteria = frappe.get_doc(
-				{"doctype": "Supplier Scorecard Criteria", "criteria_name": "_Test Criteria"}
-			)
-
-		if not frappe.db.exists("Supplier Scorecard Variable", "Test"):
-			frappe.get_doc(
-				{
-					"doctype": "Supplier Scorecard Variable",
-					"variable_label": "Test",
-					"param_name": "Test",
-					"path": "get_ordered_qty",
-				}
-			).insert(ignore_permissions=True, ignore_if_duplicate=True)
-
-		if not frappe.db.exists("Supplier", "Test Supplier for RFQ"):
-			supplier_doc = frappe.get_doc(
-				{
-					"doctype": "Supplier",
-					"supplier_name": "Test Supplier for RFQ",
-				}
-			).insert(ignore_permissions=True, ignore_if_duplicate=True)
-		else:
-			supplier_doc = frappe.get_doc({"doctype": "Supplier", "supplier_name": "Test Supplier for RFQ"})
-
-		scorecard = frappe.get_doc(
-			{
-				"doctype": "Supplier Scorecard",
-				"supplier": supplier_doc.name,
-				"period": "Per Month",
-				"criteria": [{"criteria_name": criteria.name, "weight": 100}],
-				"standings": [
-					{"min_grade": 0, "max_grade": 49, "standing": "Poor"},
-					{"min_grade": 49, "max_grade": 74, "standing": "Average"},
-					{"min_grade": 74, "max_grade": 100, "standing": "Excellent"},
-				],
-			}
-		).insert(ignore_permissions=True, ignore_if_duplicate=True)
-
-		result = make_supplier_scorecard(scorecard.name)
-
+		result = make_supplier_scorecard(self.scorecard.name)
 		self.assertEqual(result.doctype, "Supplier Scorecard Period")
 
 		if len(result.variables) > 0:
@@ -370,3 +328,63 @@ class TestSupplierScorecardPeriod(FrappeTestCase):
 			doc.calculate_criteria()
 
 		# self.assertIn("Could not solve criteria score function", str(context.exception))
+
+
+def create_supplier_related_records():
+	scorecard_criteria = "_Test Criteria"
+	scorecard_variable = "Test"
+	supplier_document = "Test Supplier for RFQ"
+	if not frappe.db.exists("Supplier Scorecard Criteria", scorecard_criteria):
+		criteria = frappe.get_doc(
+			{
+				"doctype": "Supplier Scorecard Criteria",
+				"max_score": "100",
+				"formula": "max(0,10)*100",
+				"criteria_name": "_Test Criteria",
+			}
+		).insert(ignore_permissions=True, ignore_if_duplicate=True)
+	else:
+		criteria = frappe.get_doc(
+			{"doctype": "Supplier Scorecard Criteria", "criteria_name": "_Test Criteria"}
+		)
+
+	if not frappe.db.exists("Supplier Scorecard Variable", scorecard_variable):
+		frappe.get_doc(
+			{
+				"doctype": "Supplier Scorecard Variable",
+				"variable_label": "Test",
+				"param_name": "Test",
+				"path": "get_ordered_qty",
+			}
+		).insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+	if not frappe.db.exists("Supplier", supplier_document):
+		supplier_doc = frappe.get_doc(
+			{
+				"doctype": "Supplier",
+				"supplier_name": "Test Supplier for RFQ",
+			}
+		).insert(ignore_permissions=True, ignore_if_duplicate=True)
+	else:
+		supplier_doc = frappe.get_doc({"doctype": "Supplier", "supplier_name": "Test Supplier for RFQ"})
+
+	scorecard = frappe.get_doc(
+		{
+			"doctype": "Supplier Scorecard",
+			"supplier": supplier_doc.name,
+			"period": "Per Month",
+			"criteria": [{"criteria_name": criteria.name, "weight": 100}],
+			"standings": [
+				{"min_grade": 0, "max_grade": 49, "standing": "Poor"},
+				{"min_grade": 49, "max_grade": 74, "standing": "Average"},
+				{"min_grade": 74, "max_grade": 100, "standing": "Excellent"},
+			],
+		}
+	).insert(ignore_permissions=True, ignore_if_duplicate=True)
+
+	return {
+		"criteria": criteria,
+		"scorecard_variable": scorecard_variable,
+		"supplier_document": supplier_document,
+		"scorecard": scorecard,
+	}
