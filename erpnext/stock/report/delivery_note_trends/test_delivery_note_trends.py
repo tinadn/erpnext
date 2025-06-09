@@ -34,13 +34,14 @@ class TestDeliveryNoteTrendsReport(unittest.TestCase):
 			fiscal_year.year = "2024-2025"
 			fiscal_year.year_start_date = "2024-04-01"
 			fiscal_year.year_end_date = "2025-03-31"
-			fiscal_year.companies[0].company = "_Test Company"
+			fiscal_year.append("companies", {"company": "_Test Company"})
 			fiscal_year.save()
 		else:
 			fiscal_year = frappe.get_doc("Fiscal Year", "2024-2025")
 			if not any(d.company == "_Test Company" for d in fiscal_year.companies):
 				fiscal_year.append("companies", {"company": "_Test Company"})
 				fiscal_year.save()
+
 		
 	def test_execute_with_valid_filters(self):
 		from erpnext.stock.report.delivery_note_trends import delivery_note_trends
