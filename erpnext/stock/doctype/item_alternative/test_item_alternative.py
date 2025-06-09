@@ -42,15 +42,17 @@ class TestItemAlternative(FrappeTestCase):
 		if not frappe.db.exists("Item", item_code):
 			item_code = make_test_item(item_code)
 
+		item_alternative = frappe.get_doc(
+			{
+				"doctype": "Item Alternative",
+				"item_code": item_code,
+				"alternative_item_code": item_code,
+				"two_way": 1,
+			}
+		)
+
 		with self.assertRaises(frappe.ValidationError) as context:
-			frappe.get_doc(
-				{
-					"doctype": "Item Alternative",
-					"item_code": item_code,
-					"alternative_item_code": item_code,
-					"two_way": 1,
-				}
-			).insert()
+			item_alternative.insert()
 
 		self.assertIn("Not allow to set alternative item for the item", str(context.exception))
 
@@ -70,15 +72,17 @@ class TestItemAlternative(FrappeTestCase):
 		item_create2.allow_alternative_item = 0
 		item_create2.save()
 
+		item_alternative = frappe.get_doc(
+			{
+				"doctype": "Item Alternative",
+				"item_code": item1,
+				"alternative_item_code": item2,
+				"two_way": 1,
+			}
+		)
+
 		with self.assertRaises(frappe.ValidationError) as context:
-			frappe.get_doc(
-				{
-					"doctype": "Item Alternative",
-					"item_code": item1,
-					"alternative_item_code": item2,
-					"two_way": 1,
-				}
-			).insert()
+			item_alternative.insert()
 		self.assertIn("Allow Alternative Item must be checked on Item Test Item2", str(context.exception))
 
 	# codecov
@@ -89,15 +93,16 @@ class TestItemAlternative(FrappeTestCase):
 		item_create = make_test_item(item_code)
 		item_create.allow_alternative_item = 1
 		item_create.save()
+		item_alternative = frappe.get_doc(
+			{
+				"doctype": "Item Alternative",
+				"item_code": item_code,
+				"alternative_item_code": item_code,
+				"two_way": 1,
+			}
+		)
 		with self.assertRaises(frappe.ValidationError) as context:
-			frappe.get_doc(
-				{
-					"doctype": "Item Alternative",
-					"item_code": item_code,
-					"alternative_item_code": item_code,
-					"two_way": 1,
-				}
-			).insert()
+			item_alternative.insert()
 		self.assertIn("Alternative item must not be same as item code", str(context.exception))
 
 	def test_alternative_item_for_subcontract_rm(self):
