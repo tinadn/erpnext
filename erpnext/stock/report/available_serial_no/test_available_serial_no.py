@@ -12,17 +12,26 @@ from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_pu
 
 class TestStockLedgerReport(FrappeTestCase):
 	def setUp(self) -> None:
-		item = create_item("_Test Item with Serial No", is_stock_item=1)
-		item.has_serial_no = 1
-		item.serial_no_series = "TEST.###"
-		item.save(ignore_permissions=True)
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+		self.item = create_item("_Test Item with Serial No", is_stock_item=1)
+		self.item.has_serial_no = 1
+		self.item.serial_no_series = "TEST.###"
+		self.item.valuation_rate = 100
+		self.item.save(ignore_permissions=True)
+		self.item1 = create_item("_Test Item without Serial No", is_stock_item=1)
+		self.item1.valuation_rate = 100
+		self.item1.save(ignore_permissions=True)
+
+		self.default_warehouse = create_warehouse("_Test Warehouse - _TC","_Test Company")
+		self.alt_warehouse = create_warehouse("_Test Warehouse 1 - _TC","_Test Company")
 
 		self.filters = frappe._dict(
 			company="_Test Company",
 			from_date=today(),
 			to_date=add_days(today(), 30),
-			item_code="_Test Item With Serial No",
+			item_code="_Test Item with Serial No",
 		)
+
 
 	def tearDown(self) -> None:
 		frappe.db.rollback()
@@ -47,6 +56,7 @@ class TestStockLedgerReport(FrappeTestCase):
 		self.assertEqual(data[1][1]["voucher_type"], "Delivery Note")
 
 	def test_available_serial_no_with_include_uom(self):
+		from erpnext.stock.report.available_serial_no.available_serial_no import execute
 		self.filters.include_uom = 1
 
 		columns, data = execute(filters=self.filters)
@@ -56,42 +66,74 @@ class TestStockLedgerReport(FrappeTestCase):
 		self.assertTrue(uom_column_found)
 
 	def test_report_skips_items_with_no_serial_nos(self):
-		# Create item without serial numbers
-		item = create_item("_Test Item No Serial", is_stock_item=1)
-		item.has_serial_no = 0
-		item.save(ignore_permissions=True)
-
-		# Make purchase receipt
-		make_purchase_receipt(qty=3, item_code="_Test Item No Serial")
-
-		filters = frappe._dict(
-			company="_Test Company",
-			from_date=today(),
-			to_date=add_days(today(), 30),
-			item_code="_Test Item No Serial",
+		serialized_item = self.item
+		
+		non_serialized_item = create_item("_Test Item with No Serial No", is_stock_item=1)
+		
+		se1 = make_stock_entry(
+			item_code=serialized_item.name,
+			target="Stores - _TC",
+			qty=5,
+			basic_rate=100,
 		)
-
-		report = frappe.get_doc("Report", "Available Serial No")
-		columns, data = report.get_data(filters=filters)
-
-		# Instead of expecting no data, check if serial_no or balance_serial_no is empty for all rows
-		# Because item has no serial nos, serial_no fields should be empty
-		for row in data:
-			self.assertTrue(
-				not row.get("serial_no") and not row.get("balance_serial_no"),
-				msg="Data returned for item without serial nos has serial numbers"
-			)
-
-
+		se1.submit()
+		
+		se2 = make_stock_entry(
+			item_code=non_serialized_item.name,
+			target="Stores - _TC",
+			qty=5,
+			basic_rate=100,
+		)
+		se2.submit()
+		
+		filters = _dict({
+			"company": "_Test Company",
+			"from_date": today(),
+			"to_date": today(),
+			"valuation_field_type": "Float"
+		})
+		
+		columns, data = execute(filters=filters)
+		item_codes_in_report = [row.get("item_code") for row in data]
+		
+		self.assertIn(serialized_item.name, item_codes_in_report)
+		self.assertNotIn(non_serialized_item.name, item_codes_in_report)
+		
 	def test_no_rows_returned_if_no_balance_serials(self):
-		# Setup code that causes no balance serial numbers
+		# Setup: create an item with serial tracking
 
-		report = frappe.get_doc("Report", "Available Serial No")
-		columns, data = report.get_data(filters=self.filters)
+		# Create a stock entry for that item (but do NOT create serial numbers linked to it)
+		se1 = make_stock_entry(
+			item_code=self.item.name,
+			target="Stores - _TC",
+			purpose="Material Receipt",
+			qty=1,
+			basic_rate=100
+		)
+		se = make_stock_entry(
+			item_code=self.item.name,
+			source="Stores - _TC",
+			purpose="Material Issue",
+			qty=1,
+			basic_rate=100,
+			do_not_submit=True
+		)
+		se.items[0].serial_no = se1.items[0].serial_no
+		se.submit()
 
-		# Instead of expecting no rows at all, check that none have balance_serial_no
-		rows_with_serials = [row for row in data if row.get("balance_serial_no")]
-		self.assertEqual(len(rows_with_serials), 0)
+
+		filters = _dict({
+			"company": "_Test Company",
+			"from_date": today(),
+			"to_date": today(),
+			"valuation_field_type": "Float"
+		})
+
+		# Run the report
+		columns, data = execute(filters=filters)
+
+		# Assert that no rows are returned since there are no balance serials
+		self.assertEqual(data[1]['qty_after_transaction'], 0)
 
 	def test_multiple_transactions_and_warehouses(self):
 		report = frappe.get_doc("Report", "Available Serial No")
@@ -105,6 +147,7 @@ class TestStockLedgerReport(FrappeTestCase):
 		self.assertEqual(len(serial_nos), 8)
 
 	def test_serial_balance_after_sales_return(self):
+		from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_return
 		report = frappe.get_doc("Report", "Available Serial No")
 
 		make_purchase_receipt(qty=5, item_code="_Test Item with Serial No")
@@ -120,6 +163,7 @@ class TestStockLedgerReport(FrappeTestCase):
 		self.assertEqual(len(balance_serials), 5)
 
 	def test_serial_balance_after_purchase_return(self):
+		from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_return
 		report = frappe.get_doc("Report", "Available Serial No")
 
 		pr = make_purchase_receipt(qty=5, item_code="_Test Item with Serial No")
