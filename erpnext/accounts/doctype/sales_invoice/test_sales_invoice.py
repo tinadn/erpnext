@@ -7608,7 +7608,6 @@ def add_taxes(doc):
 
 def create_customer(**args):
 	if not frappe.db.exists("Customer", args.get("customer_name")):
-		print("working", "working")
 		customer = frappe.new_doc("Customer")
 		customer.customer_name = args.get("customer_name")
 		customer.type = "Individual"
