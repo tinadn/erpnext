@@ -32,8 +32,8 @@ class TestDeliveryNoteTrendsReport(unittest.TestCase):
 		self.dn.submit()
 		fiscal_year = frappe.new_doc("Fiscal Year")
 		fiscal_year.year = "2024-2025"
-		fiscal_year.year_start_date = "01-04-2024"
-		fiscal_year.year_end_date = "31-03-2025"
+		fiscal_year.year_start_date = '2024-04-01'
+		fiscal_year.year_end_date = '2025-03-31'
 		fiscal_year.append("companies", {"company": "_Test Company"})
 		fiscal_year.save()
 		
