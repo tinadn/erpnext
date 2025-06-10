@@ -23,7 +23,7 @@ from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 from erpnext.stock.doctype.material_request.material_request import make_stock_entry as make_mr_se
 from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
 from erpnext.stock.doctype.serial_no.serial_no import *
-from erpnext.stock.doctype.stock_entry.stock_entry import FinishedGoodError, make_stock_in_entry
+from erpnext.stock.doctype.stock_entry.stock_entry import FinishedGoodError, make_stock_in_entry,move_sample_to_retention_warehouse
 from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 from erpnext.stock.doctype.stock_ledger_entry.stock_ledger_entry import StockFreezeError
 from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import (
@@ -35,6 +35,8 @@ from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import
 from erpnext.stock.serial_batch_bundle import SerialBatchCreation
 from erpnext.stock.stock_ledger import NegativeStockError, get_previous_sle
 from datetime import date
+from erpnext.buying.doctype.supplier.test_supplier import create_supplier
+
 
 
 
@@ -2508,10 +2510,14 @@ class TestStockEntry(FrappeTestCase):
 	def setUp(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company,create_customer
 		create_company()
+
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import  get_or_create_fiscal_year
+		get_or_create_fiscal_year("_Test Company")
+		
 		create_customer(name = '_Test Customer')
+
 		create_warehouse(
 			warehouse_name="_Test Warehouse - _TC",
-			properties={"parent_warehouse": "All Warehouses - _TC"},
 			company="_Test Company",
 		)
 		
@@ -4434,7 +4440,400 @@ class TestStockEntry(FrappeTestCase):
 		self.assertTrue(batch_exists1, "Batch should exist in the system.")
 		batch_exists = frappe.db.exists("Batch", {"batch_id": batch_no2})
 		self.assertTrue(batch_exists, "Batch should exist in the system.")
-            
+
+	def test_onload_stock_entry_TC_SCK_361(self):
+
+		warehouse = create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company")
+
+		if not frappe.db.exists("Item", "_Test Item"):
+			create_item("_Test Item", warehouse=warehouse, company="_Test Company")
+
+        # Create Stock Entry with 1 item
+		se = make_stock_entry(item_code="_Test Item", target=warehouse, qty=1, basic_rate=100)
+
+        # Simulate onload
+		se.onload()
+
+		self.assertTrue(True)
+
+	def test_set_job_card_data_single_function_TC_SCK_362(self):
+
+		warehouse = create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company")
+
+    	# Create test item
+		if not frappe.db.exists("Item", "_Test FG Item"):
+			frappe.get_doc({
+    	        "doctype": "Item",
+    	        "item_code": "_Test FG Item",
+    	        "item_name": "_Test FG Item",
+    	        "stock_uom": "Nos",
+    	        "is_stock_item": 1,
+				"gst_hsn_code":"100111"
+    	    }).insert()
+
+    	# Create BOM
+		if not frappe.db.exists("BOM", {"item": "_Test FG Item"}):
+			bom = frappe.get_doc({
+    	        "doctype": "BOM",
+    	        "item": "_Test FG Item",
+    	        "is_active": 1,
+    	        "is_default": 1,
+    	        "quantity": 1,
+    	        "items": [{
+    	            "item_code": "_Test FG Item",
+    	            "qty": 1,
+    	            "rate": 100,
+    	        }]
+    	    }).insert()
+			bom_no = bom.name
+		else:
+			bom_no = frappe.get_value("BOM", {"item": "_Test FG Item"})
+
+    	# Create Work Order
+		wo = frappe.get_doc({
+    	    "doctype": "Work Order",
+    	    "production_item": "_Test FG Item",
+    	    "bom_no": bom_no,
+    	    "qty": 5,
+    	    "fg_warehouse": warehouse,
+    	    "company": "_Test Company"
+    	}).insert()
+
+
+		wip_warehouse = create_warehouse(warehouse_name="WIP",company="_Test Company")
+
+		if not frappe.db.exists("Workstation", "WS"):
+			ws = frappe.get_doc({
+            	"doctype": "Workstation",
+            	"workstation_name": "WS",
+            	"company": '_Test Company',
+        	})
+			ws.insert()	
+	
+    	# Create Job Card
+		jc = frappe.get_doc({
+    	    "doctype": "Job Card",
+    	    "work_order": wo.name,
+    	    "operation": "Cutting",
+    	    "for_quantity": 5,
+			"wip_warehouse":wip_warehouse,
+			"workstation": "WS", 
+    	}).insert()
+
+    	# Create Stock Entry and assign job_card
+		se = frappe.get_doc({
+    	    "doctype": "Stock Entry",
+    	    "stock_entry_type": "Manufacture",
+    	    "company": "_Test Company",
+    	    "job_card": jc.name
+    	})
+
+    	# Call the function to test
+		se.set_job_card_data()
+
+    	# Fetch job card data for assertions
+		jc_data = frappe.db.get_value("Job Card", jc.name, ["for_quantity", "work_order", "bom_no"], as_dict=1)
+
+    	# Assertions
+		assert se.fg_completed_qty == jc_data.for_quantity
+		assert se.work_order == jc_data.work_order
+		assert se.from_bom == 1
+		assert se.bom_no == jc_data.bom_no
+
+	def test_get_stock_and_rate_TC_SCK_363(self):
+
+		warehouse = create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company")
+
+		if not frappe.db.exists("Item", "_Test Item"):
+			create_item("_Test Item", warehouse=warehouse, company="_Test Company")
+
+        # Create test stock entry
+		se = make_stock_entry(item_code="_Test Item", target=warehouse, qty=2, basic_rate=100)
+
+        # Call the method to test
+		se.get_stock_and_rate()
+
+        # Reload and assert
+		updated_item = se.items[0]
+		self.assertGreater(updated_item.basic_rate, 0)
+		self.assertEqual(updated_item.amount, updated_item.basic_rate * updated_item.qty)
+		self.assertGreaterEqual(updated_item.actual_qty, 2)
+
+	def test_move_sample_to_retention_warehouse_TC_SCK_364(self):
+		company = "_Test Company"
+
+		# Create Retention Warehouse
+		retention_warehouse = create_warehouse(warehouse_name="Sample Retention",company="_Test Company")
+
+		# Set in Stock Settings
+		frappe.set_value("Stock Settings", None, "sample_retention_warehouse", retention_warehouse)
+
+		# Create Source Warehouse
+		source_warehouse = create_warehouse(warehouse_name="Source WH",company="_Test Company")
+
+		# Create Item Group if not exists
+		if not frappe.db.exists("Item Group", "Test Group"):
+			frappe.get_doc({
+				"doctype": "Item Group",
+				"item_group_name": "Test Group",
+				"is_group": 0
+			}).insert()	
+
+		# Create Item
+		item_code = "_Test Item"
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": "Test Item",
+				"item_group":"Test Group",
+				"is_stock_item": 1,
+				"has_batch_no": 1,
+				"create_new_batch": 1,
+				"stock_uom": "Nos",
+				"gst_hsn_code":"100111",
+				"sample_quantity": 10
+			}).insert()
+
+		# Create Serial and Batch Bundle
+		bundle_name = create_serial_and_batch_bundle()
+
+
+		# Duplicate bundle outward to simulate sample packaging
+		creator = SerialBatchCreation({
+			"type_of_transaction": "Outward",
+			"serial_and_batch_bundle": bundle_name,
+			"item_code": item_code,
+			"warehouse": source_warehouse,
+		})
+		creator.duplicate_package()
+
+		# Prepare item data
+		items = [{
+			"item_code": item_code,
+			"sample_quantity": 2,
+			"serial_and_batch_bundle": creator.serial_and_batch_bundle,
+			"t_warehouse": source_warehouse,
+			"valuation_rate": 100,
+			"uom": "Nos",
+			"stock_uom": "Nos",
+			"qty": 10 
+		}]
+
+		# Call the target function
+		move_sample_to_retention_warehouse(company, json.dumps(items))
+
+	def test_get_expired_batch_items_TC_SCK_365(self):
+		from erpnext.stock.doctype.stock_entry.stock_entry import get_expired_batch_items
+
+		frappe.set_user("Administrator")
+		warehouse = create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company")
+
+		# Create a unique item with batch enabled
+		self.item_code = "_Test Batch Item " + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Item", self.item_code):
+			self.item = make_item(
+				self.item_code,
+				{
+					"is_stock_item": 1,
+					"has_batch_no": 1,
+					"create_new_batch": 1,
+					"valuation_rate": 100,
+					"stock_uom": "Nos"
+				}
+			)
+		else:
+			self.item = frappe.get_doc("Item", self.item_code)
+
+		# Create expired batch (expired yesterday)
+		self.batch_name = self.item_code + "-BATCH"
+		if not frappe.db.exists("Batch", self.batch_name):
+			self.batch = frappe.get_doc({
+				"doctype": "Batch",
+				"item": self.item.name,
+				"batch_id": self.batch_name,
+				"expiry_date": add_days(today(), -1)
+			}).insert(ignore_permissions=True)
+		else:
+			self.batch = frappe.get_doc("Batch", self.batch_name)
+
+		# Add stock entry using this batch
+		if not frappe.db.exists("Stock Ledger Entry", {"batch_no": self.batch.name}):
+			make_stock_entry(
+				item_code=self.item.name,
+				qty=5,
+				target=warehouse,
+				batch_no=self.batch.name,
+		 )
+
+		result = get_expired_batch_items()
+
+		self.assertIsInstance(result, list)
+		self.assertTrue(result, "Expected at least one expired batch item")
+
+		batch_nos = [row.get("batch_no") for row in result]
+		self.assertIn(self.batch.name, batch_nos, "Expired batch should be in the result")
+
+	def test_get_expired_batches_TC_SCK_366(self):
+		from erpnext.stock.doctype.stock_entry.stock_entry import get_expired_batches
+
+		frappe.set_user("Administrator")
+	
+		# Create a unique item with batch enabled
+		item_code = "_Test Expired Batch Item " + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Item", item_code):
+			item = make_item(
+				item_code,
+				{
+					"is_stock_item": 1,
+					"has_batch_no": 1,
+					"create_new_batch": 1,
+					"valuation_rate": 100,
+					"stock_uom": "Nos"
+				}
+			)
+		else:
+			item = frappe.get_doc("Item", item_code)
+
+		# Create expired batch (expired yesterday)
+		expired_batch_name = item_code + "-BATCH-EXPIRED"
+		if not frappe.db.exists("Batch", expired_batch_name):
+			expired_batch = frappe.get_doc({
+				"doctype": "Batch",
+				"item": item.name,
+				"batch_id": expired_batch_name,
+				"expiry_date": add_days(today(), -1),
+			}).insert(ignore_permissions=True)
+		else:
+			expired_batch = frappe.get_doc("Batch", expired_batch_name)
+
+		# Create non-expired batch (expires in future)
+		valid_batch_name = item_code + "-BATCH-VALID"
+		if not frappe.db.exists("Batch", valid_batch_name):
+			frappe.get_doc({
+				"doctype": "Batch",
+				"item": item.name,
+				"batch_id": valid_batch_name,
+				"expiry_date": add_days(today(), 10),
+			}).insert(ignore_permissions=True)
+
+		# Fetch expired batches
+		expired_batches = get_expired_batches()
+
+		# Assertions
+		self.assertIsInstance(expired_batches, dict)
+		self.assertIn(expired_batch.name, expired_batches, "Expired batch should be included")
+		self.assertNotIn(valid_batch_name, expired_batches, "Non-expired batch should not be included")
+	
+
+	def test_get_warehouse_details_TC_SCK_367(self):
+		from erpnext.stock.doctype.stock_entry.stock_entry import get_warehouse_details
+		from frappe.utils import nowdate, nowtime
+
+		frappe.set_user("Administrator")
+		warehouse = create_warehouse("_Test Warehouse WHD", company="_Test Company")
+
+		# Create a stock item
+		item_code = "_Test Item WHD " + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Item", item_code):
+			item = make_item(
+				item_code,
+				{
+					"is_stock_item": 1,
+					"valuation_rate": 250,
+					"stock_uom": "Nos"
+				}
+			)
+		else:
+			item = frappe.get_doc("Item", item_code)
+
+		# Add stock
+		make_stock_entry(
+			item_code=item.name,
+			qty=10,
+			target=warehouse,
+			basic_rate=250
+		)
+
+		# Prepare args
+		args = {
+			"item_code": item.name,
+			"warehouse": warehouse,
+			"posting_date": nowdate(),
+			"posting_time": nowtime()
+		}
+
+		# Call the function
+		result = get_warehouse_details(args)
+
+		# Assertions
+		self.assertIsInstance(result, dict)
+		self.assertIn("actual_qty", result)
+		self.assertIn("basic_rate", result)
+
+		self.assertEqual(result["actual_qty"], 10)
+		self.assertEqual(result["basic_rate"], 250)
+
+	def test_get_batchwise_serial_nos_TC_SCK_368(self):
+		from erpnext.stock.doctype.stock_entry.stock_entry import get_batchwise_serial_nos
+
+		frappe.set_user("Administrator")
+		warehouse = create_warehouse("_Test WH BatchSerial", company="_Test Company")
+
+		# Create serialized + batched item
+		item_code = "_Test Item BSN " + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Item", item_code):
+			item = make_item(
+				item_code,
+				{
+					"has_serial_no": 1,
+					"has_batch_no": 1,
+					"create_new_batch": 1,
+					"serial_no_series": "SN-BSN-.###",
+					"stock_uom": "Nos",
+					"is_stock_item": 1,
+					"valuation_rate": 100
+				}
+			)
+		else:
+			item = frappe.get_doc("Item", item_code)
+
+		# Create Stock Entry to generate Serial No and Batch
+		se = make_stock_entry(
+			item_code=item.name,
+			qty=3,
+			target=warehouse,
+			basic_rate=100,
+			is_submit=True,
+			set_posting_time=True,
+			serial_nos=None,  # let system auto-create
+		)
+
+		# Get the generated serial numbers and batch
+		serial_nos = [
+			d.serial_no for d in frappe.get_all(
+				"Serial No",
+				filters={"item_code": item.name},
+				fields=["name as serial_no"],
+				order_by="creation desc",
+				limit=3
+			)
+		]
+
+		batch_no = frappe.get_value("Serial No", serial_nos[0], "batch_no")
+
+		row = frappe._dict({
+			"batches_to_be_consume": [batch_no],
+			"serial_nos": serial_nos
+		})
+		# Function call
+		result = get_batchwise_serial_nos(item.name, row)
+
+		# Assertions
+		self.assertIsInstance(result, dict)
+		self.assertIn(batch_no, result)
+		self.assertEqual(sorted(serial_nos), result[batch_no])
+
 
 def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
 		bom = frappe.new_doc("BOM")
@@ -4718,3 +5117,50 @@ def create_company_se():
 		company = company.save()
 		company.load_from_db()
 	return company_name
+
+
+def create_serial_and_batch_bundle():
+	# Create Item Group if needed
+	if not frappe.db.exists("Item Group", "Test Group"):
+		frappe.get_doc({
+			"doctype": "Item Group",
+			"item_group_name": "Test Group",
+			"is_group": 0
+		}).insert()
+
+	# Create Item with batch enabled
+	if not frappe.db.exists("Item", "_Test Item"):
+		frappe.get_doc({
+			"doctype": "Item",
+			"item_code": "_Test Item",
+			"item_name": "Test Item",
+			"is_stock_item": 1,
+			"has_batch_no": 1,
+			"create_new_batch": 1,
+			"stock_uom": "Nos",
+			"item_group": "Test Group"
+		}).insert()
+
+	# Create Batch
+	batch = frappe.get_doc({
+		"doctype": "Batch",
+		"item": "_Test Item",
+		"batch_id": "BATCH-001"
+	}).insert()
+
+	# Create Serial and Batch Bundle
+	sbb = frappe.get_doc({
+		"doctype": "Serial and Batch Bundle",
+		"type_of_transaction": "Inward",
+		"voucher_type": "Stock Entry",
+		"item_code": "_Test Item",
+		"entries": [
+			{
+				"batch_no": batch.name,
+				"qty": 5,
+				"uom": "Nos"
+			}
+		]
+	})
+	sbb.insert()
+	return sbb.name
