@@ -17,6 +17,7 @@ from erpnext.stock.serial_batch_bundle import SerialBatchBundle
 from erpnext.stock.stock_ledger import get_previous_sle
 
 
+
 class StockFreezeError(frappe.ValidationError):
 	pass
 
@@ -36,7 +37,7 @@ class StockLedgerEntry(Document):
 
 	from typing import TYPE_CHECKING
 
-	if TYPE_CHECKING:
+	if TYPE_CHECKING: # pragma: no cover
 		from frappe.types import DF
 
 		actual_qty: DF.Float
