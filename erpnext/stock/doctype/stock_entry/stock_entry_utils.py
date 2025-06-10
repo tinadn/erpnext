@@ -9,7 +9,7 @@ from frappe.utils import cint, flt
 
 import erpnext
 
-if TYPE_CHECKING:
+if TYPE_CHECKING: # pragma: no cover
 	from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 
 

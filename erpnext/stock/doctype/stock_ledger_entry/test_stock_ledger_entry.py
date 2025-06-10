@@ -13,7 +13,7 @@ from frappe.utils import add_days, add_to_date, flt, today
 
 from erpnext.accounts.doctype.gl_entry.gl_entry import rename_gle_sle_docs
 from erpnext.stock.doctype.delivery_note.test_delivery_note import create_delivery_note
-from erpnext.stock.doctype.item.test_item import make_item
+from erpnext.stock.doctype.item.test_item import make_item,create_item
 from erpnext.stock.doctype.landed_cost_voucher.test_landed_cost_voucher import (
 	create_landed_cost_voucher,
 )
@@ -28,12 +28,19 @@ from erpnext.stock.doctype.stock_reconciliation.test_stock_reconciliation import
 )
 from erpnext.stock.stock_ledger import get_previous_sle
 from erpnext.stock.tests.test_utils import StockTestMixin
+from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+from erpnext.stock.doctype.stock_ledger_entry.stock_ledger_entry import on_doctype_update
+
 
 
 class TestStockLedgerEntry(FrappeTestCase, StockTestMixin):
 	def setUp(self):
 		from erpnext.accounts.doctype.payment_entry.test_payment_entry import create_company
 		create_company()
+
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import get_or_create_fiscal_year
+		get_or_create_fiscal_year('_Test Company')
+
 		items = create_items()
 		reset("Stock Entry")
 
@@ -1385,6 +1392,39 @@ class TestStockLedgerEntry(FrappeTestCase, StockTestMixin):
 			item_code=item_code, source=warehouse, qty=470.84, rate=100, posting_date=add_days(today(), -1)
 		)
 
+	def test_cannot_cancel_sle_directly_TC_SCK_359(self):
+
+		warehouse = create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company")
+
+		if not frappe.db.exists("Item", "_Test Item"):
+			create_item("_Test Item", warehouse=warehouse, company="_Test Company")
+
+		# Create a stock entry that will generate SLE
+		stock_entry = make_stock_entry(
+			item_code="_Test Item",
+			qty=1,
+			target=warehouse,
+			basic_rate=100,
+			stock_entry_type="Material Receipt",
+		)
+		stock_entry.save()
+		stock_entry.submit()
+
+		# Get the corresponding SLE
+		sle_name = frappe.db.get_value(
+			"Stock Ledger Entry",
+			{"voucher_type": "Stock Entry", "voucher_no": stock_entry.name},
+			"name"
+		)
+		sle = frappe.get_doc("Stock Ledger Entry", sle_name)
+
+		# Validate that cancelling an SLE raises the correct error
+		with self.assertRaises(frappe.ValidationError, msg="Individual Stock Ledger Entry cannot be cancelled"):
+			sle.on_cancel()
+
+	def test_on_doctype_update_adds_indexes_TC_SCK_360(self):
+		# Call the function
+		on_doctype_update()
 
 def create_repack_entry(**args):
 	args = frappe._dict(args)

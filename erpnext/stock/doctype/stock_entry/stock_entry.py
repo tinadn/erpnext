@@ -85,7 +85,7 @@ class StockEntry(StockController):
 
 	from typing import TYPE_CHECKING
 
-	if TYPE_CHECKING:
+	if TYPE_CHECKING: # pragma: no cover
 		from frappe.types import DF
 
 		from erpnext.stock.doctype.landed_cost_taxes_and_charges.landed_cost_taxes_and_charges import (
@@ -2726,7 +2726,7 @@ def move_sample_to_retention_warehouse(company, items):
 	from erpnext.stock.serial_batch_bundle import SerialBatchCreation
 
 	if isinstance(items, str):
-		items = json.loads(items)
+		items = json.loads(items)	
 	retention_warehouse = frappe.db.get_single_value("Stock Settings", "sample_retention_warehouse")
 	stock_entry = frappe.new_doc("Stock Entry")
 	stock_entry.company = company
@@ -2903,9 +2903,7 @@ def get_valuation_rate_for_finished_good_entry(work_order):
 	work_order_qty = flt(
 		frappe.get_cached_value("Work Order", work_order, "material_transferred_for_manufacturing")
 	)
-
 	field = "(SUM(total_outgoing_value) / %s) as valuation_rate" % (work_order_qty)
-
 	stock_data = frappe.get_all(
 		"Stock Entry",
 		fields=field,
