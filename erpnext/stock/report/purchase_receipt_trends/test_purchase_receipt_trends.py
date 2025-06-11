@@ -52,7 +52,7 @@ class TestPurchaseReceiptTrendsReport(FrappeTestCase):
 
 			self.supplier_names.append(supplier.name)
 
-			item = create_item(item_code= f"_Test Item Chart {i}", is_stock_item = 1, stock_uom =  "Nos"})
+			item = create_item(item_code= f"_Test Item Chart {i}", is_stock_item = 1, stock_uom =  "Nos")
 			item.set("item_defaults", [])  # Clear existing defaults
 			item.append("item_defaults", {
 				"company": self.company.name,
