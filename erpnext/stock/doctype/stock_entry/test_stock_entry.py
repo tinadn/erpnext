@@ -23,7 +23,7 @@ from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 from erpnext.stock.doctype.material_request.material_request import make_stock_entry as make_mr_se
 from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
 from erpnext.stock.doctype.serial_no.serial_no import *
-from erpnext.stock.doctype.stock_entry.stock_entry import FinishedGoodError, make_stock_in_entry,move_sample_to_retention_warehouse
+from erpnext.stock.doctype.stock_entry.stock_entry import FinishedGoodError, make_stock_in_entry,move_sample_to_retention_warehouse,create_serial_and_batch_bundle,get_items_from_subcontract_order
 from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
 from erpnext.stock.doctype.stock_ledger_entry.stock_ledger_entry import StockFreezeError
 from erpnext.stock.doctype.stock_reconciliation.stock_reconciliation import (
@@ -4596,7 +4596,7 @@ class TestStockEntry(FrappeTestCase):
 			}).insert()
 
 		# Create Serial and Batch Bundle
-		bundle_name = create_serial_and_batch_bundle()
+		bundle_name = custom_create_serial_and_batch_bundle()
 
 
 		# Duplicate bundle outward to simulate sample packaging
@@ -4834,37 +4834,488 @@ class TestStockEntry(FrappeTestCase):
 		self.assertIn(batch_no, result)
 		self.assertEqual(sorted(serial_nos), result[batch_no])
 
+	def test_validate_work_order_status_throws_on_completed_work_order_TC_SCK_395(self):		
 
-def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
-		bom = frappe.new_doc("BOM")
-		bom.update(
-			{
-				"item": bom_item or "_Test Item",
-				"company": company or "_Test Company",
-				"quantity": qty or 1,
-			}
-		)
-		if properties:
-			bom.update(properties)
+		frappe.set_user("Administrator")
 
-		for item in rm_items:
-			item_args = {}
+		# Create Item
+		if not frappe.db.exists("Item", "Test WO Item"):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "Test WO Item",
+				"is_stock_item": 1,
+				"stock_uom": "Nos",
+				"valuation_rate": 100,
+				"gst_hsn_code": "01011010",
 
-			item_args.update(
-				{
-					"item_code": item.get('item_code'),
-					"qty": item.get('qty'),
-					"uom": item.get('uom'),
-					"rate": item.get('rate')
-				}
+			}).insert(ignore_permissions=True)
+
+		if not frappe.db.exists("Item", "Test FG Item"):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "Test FG Item",
+				"is_stock_item": 1,
+				"stock_uom": "Nos",
+				"valuation_rate": 100,
+				"gst_hsn_code": "01011010",
+
+			}).insert(ignore_permissions=True)	
+
+		# Create BOM
+		if not frappe.db.exists("BOM", {"item": "Test WO Item", "is_active": 1}):
+			from erpnext.manufacturing.doctype.bom.test_bom import make_bom
+			make_bom(
+			    item="Test WO Item",
+			    currency="USD",
+			    quantity=1,
+			    company="_Test Company",
+				raw_materials = [
+    				{
+    				    "item_code": "Test FG Item",
+    				}
+]
+
 			)
 
-			bom.append("items", item_args)
+		# Create Work Order and force status to Completed
+		wo = frappe.get_doc({
+			"doctype": "Work Order",
+			"production_item": "Test WO Item",
+			"qty": 1,
+			"bom_no": frappe.db.get_value("BOM", {"item": "Test WO Item", "is_active": 1}),
+			"fg_warehouse": create_warehouse("WO FG", company="_Test Company"),
+			"company": "_Test Company"
+		})
+		wo.insert(ignore_permissions=True)
+		wo.db_set("status", "Completed")
 
-		bom.save(ignore_permissions=True)
-		bom.submit()
+		# Create Stock Entry linked to Completed Work Order
+		se = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Manufacture",
+			"company": "_Test Company",
+			"work_order": wo.name,
+			"items": [{
+				"item_code": "Test WO Item",
+				"qty": 1,
+				"t_warehouse": wo.fg_warehouse
+			}]
+		})
 
-		return bom
+		# This should raise because WO is Completed
+		with self.assertRaises(frappe.ValidationError, msg="Should raise for Completed Work Order"):
+			se.validate_work_order_status()
+
+
+	def test_validate_purpose_with_invalid_purpose_TC_SCK_396(self):
+		frappe.set_user("Administrator")
+
+		# Create basic stock entry with invalid purpose
+		se = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Invalid Type",
+			"purpose": "Invalid Type",
+			"company": "_Test Company"
+		})
+
+		with self.assertRaises(frappe.ValidationError) as cm:
+			se.validate_purpose()
+
+		self.assertIn("Purpose must be one of", str(cm.exception))
+
+
+	def test_validate_purpose_with_job_card_disallowed_purpose_TC_SCK_397(self):
+		frappe.set_user("Administrator")
+
+		# Simulate job card (no need to insert if not validated)
+		job_card_name = "TEST-JC-001"
+
+		# Use disallowed purpose with job card
+		se = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Issue",
+			"purpose": "Material Issue",
+			"job_card": job_card_name,
+			"company": "_Test Company"
+		})
+
+		with self.assertRaises(frappe.ValidationError) as cm:
+			se.validate_purpose()
+
+		self.assertIn("For job card", str(cm.exception))
+
+
+	def test_delete_linked_stock_entry_removes_draft_receive_entry_TC_SCK_398(self):
+		frappe.set_user("Administrator")
+
+		# Make sure test item exists
+		if not frappe.db.exists("Item", "Test Item"):
+			make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1})
+
+		item=frappe.get_doc("Item","Test Item")
+		item.valuation_rate=100
+		item.save()
+		source_warehouse = create_warehouse("Source WH", company="_Test Company")
+		target_warehouse = create_warehouse("Target WH", company="_Test Company")
+
+		# Step 1: Create 'Send to Warehouse' Stock Entry with temporary valid purpose
+		se_send = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Issue",
+			"purpose": "Material Issue",
+			"company": "_Test Company",
+			"items": [{
+				"item_code": "Test Item",
+				"qty": 1,
+				"uom": "Nos",
+				"s_warehouse": source_warehouse,
+			}]
+		})
+		se_send.insert(ignore_permissions=True)
+
+		# Step 2: Create a draft 'Receive at Warehouse' entry linked to the above
+		se_receive = frappe.get_doc({
+			"doctype": "Stock Entry",
+			"stock_entry_type": "Material Receipt",
+			"purpose": "Receive at Warehouse",
+			"outgoing_stock_entry": se_send.name,
+			"company": "_Test Company",
+			"items": [{
+				"item_code": "Test Item",
+				"qty": 1,
+				"uom": "Nos",
+				"t_warehouse": target_warehouse,
+				
+			}]
+		})
+		se_receive.insert(ignore_permissions=True)
+		se_receive.db_set("purpose", "Receive at Warehouse")
+		# Confirm the linked entry exists
+		self.assertTrue(frappe.db.exists("Stock Entry", se_receive.name))
+
+		# Simulate 'Send to Warehouse' purpose
+		se_send.db_set("purpose", "Send to Warehouse")
+
+		# Call method under test
+		se_send.delete_linked_stock_entry()
+
+		# Confirm the linked draft entry was deleted
+		self.assertFalse(frappe.db.exists("Stock Entry", se_receive.name))
+
+
+	def test_set_transfer_qty_throws_on_zero_qty_TC_SCK_399(self):
+		frappe.set_user("Administrator")
+
+		se = frappe.get_doc({
+    	    "doctype": "Stock Entry",
+    	    "stock_entry_type": "Material Transfer",
+    	    "purpose": "Material Transfer",
+    	    "company": "_Test Company",
+    	    "items": [{
+    	        "item_code": "Test Item",
+    	        "qty": 0,  # <- This should trigger the first condition
+    	        "uom": "Nos",
+    	        "conversion_factor": 1,
+    	        "s_warehouse": create_warehouse("ZeroQty WH", {"company": "_Test Company"}),
+        "t_warehouse": create_warehouse("Target WH", {"company": "_Test Company"})
+    	    }]
+    	})
+
+		with self.assertRaises(frappe.ValidationError) as cm:
+			se.set_transfer_qty()
+
+		self.assertIn("Qty is mandatory", str(cm.exception))
+
+	def test_set_transfer_qty_throws_on_missing_conversion_factor_TC_SCK_400(self):
+		frappe.set_user("Administrator")
+
+		se = frappe.get_doc({
+    	    "doctype": "Stock Entry",
+    	    "stock_entry_type": "Material Transfer",
+    	    "purpose": "Material Transfer",
+    	    "company": "_Test Company",
+    	    "items": [{
+    	        "item_code": "Test Item",
+    	        "qty": 2,
+    	        "uom": "Nos",
+    	        "conversion_factor": 0,  # <- This should trigger the second condition
+    	         "s_warehouse": create_warehouse("ZeroQty WH", {"company": "_Test Company"}),
+        "t_warehouse": create_warehouse("Target WH", {"company": "_Test Company"})
+    	    }]
+    	})
+
+		with self.assertRaises(frappe.ValidationError) as cm:
+			se.set_transfer_qty()
+
+		self.assertIn("UOM Conversion Factor is mandatory", str(cm.exception))
+
+	def test_create_serial_and_batch_bundle_combined_conditions_TC_TC_SCK_401(self):
+		frappe.set_user("Administrator")	
+		# Setup: Create item with both serial and batch tracking
+		item_code = "_Test SerialBatch Item"
+		if not frappe.db.exists("Item", item_code):
+			frappe.get_doc({
+		        "doctype": "Item",
+		        "item_code": item_code,
+		        "item_name": item_code,
+		        "has_serial_no": 1,
+		        "has_batch_no": 1,
+		        "is_stock_item": 1,
+		        "stock_uom": "Nos",
+				"gst_hsn_code": "01011010",
+
+		    }).insert()	
+		# Setup: Create warehouse
+		warehouse = create_warehouse("_Test WH S+B", company="_Test Company")	
+		# Create batch
+		batch_no = frappe.get_doc({
+		    "doctype": "Batch",
+		    "item": item_code,
+			 "batch_id": "TEST-BATCH-001"
+		}).insert().name	
+		# Create serial nos for that batch
+		serial_nos = []
+		for i in range(2):
+			serial_nos.append(f"SRL-SB-{i}")
+			frappe.get_doc({
+		        "doctype": "Serial No",
+		        "serial_no": serial_nos[-1],
+		        "item_code": item_code,
+		        "batch_no": batch_no
+		    }).insert()	
+		# Mock parent_doc and row
+		parent_doc = frappe._dict({
+		    "posting_date": today(),
+		    "posting_time": "10:00:00"
+		})	
+		row = frappe._dict({
+		    "warehouse": warehouse,
+		    "serial_nos": serial_nos.copy(),  # pass both serial and batch
+		    "batches_to_be_consume": {batch_no: 2}
+		})	
+		child = frappe._dict({
+		    "item_code": item_code,
+		    "warehouse": warehouse
+		})	
+		# Call function
+		bundle_name = create_serial_and_batch_bundle(parent_doc, row, child)	
+		self.assertTrue(bundle_name)
+		bundle = frappe.get_doc("Serial and Batch Bundle", bundle_name)	
+		# Validate both serials and batch are captured
+		self.assertEqual(bundle.has_serial_no, 1)
+		self.assertEqual(bundle.has_batch_no, 1)
+		self.assertEqual(len(bundle.entries), 2)
+
+	def test_create_serial_bundle_only_serials_TC_SCK_402(self):
+		frappe.set_user("Administrator")
+
+		# Step 1: Setup Item with Serial No
+		item_code = "_Test Serial Item"
+		if not frappe.db.exists("Item", item_code):
+			item = frappe.get_doc({
+				"doctype": "Item",
+				"item_code": item_code,
+				"item_name": item_code,
+				"stock_uom": "Nos",
+				"is_stock_item": 1,
+				"has_serial_no": 1,
+				"gst_hsn_code": "01011010",
+				"serial_no_series": "SRL-TEST-.#####"
+
+			})
+			item.insert()
+
+		# Step 2: Create Stock Entry to auto-generate Serial No
+		warehouse = create_warehouse("_Test Serial WH", company="_Test Company")
+		se = make_stock_entry(
+			item_code=item_code,
+			qty=1,
+			target=warehouse,
+			basic_rate=100,
+			stock_entry_type="Material Receipt"
+		)
+
+		serial_no = frappe.get_value("Serial No", {"item_code": item_code}, "name")
+		self.assertIsNotNone(serial_no)
+
+		# Step 3: Prepare dummy parent_doc and row to simulate stock entry context
+
+		parent_doc = frappe._dict({
+			"posting_date": se.posting_date,
+			"posting_time": se.posting_time
+		})
+
+		row = frappe._dict({
+			"serial_nos": [serial_no],
+			"warehouse": warehouse
+		})
+
+		child = frappe._dict({
+			"item_code": item_code
+		})
+
+		# Step 4: Call the function and verify
+		bundle_name = create_serial_and_batch_bundle(parent_doc, row, child)
+		self.assertTrue(bundle_name)
+
+		bundle_doc = frappe.get_doc("Serial and Batch Bundle", bundle_name)
+		self.assertEqual(bundle_doc.has_serial_no, 1)
+		self.assertEqual(len(bundle_doc.entries), 1)
+		self.assertEqual(bundle_doc.entries[0].serial_no, serial_no)
+
+
+	def test_get_items_from_subcontract_order_TC_SCK_403(self):
+		frappe.set_user("Administrator")
+
+		# Create required warehouses
+		default_wh = create_warehouse("_Test Warehouse", company="_Test Company")
+		subcontract_wh = create_warehouse("_Test Subcontract WH", company="_Test Company")
+
+		# Now create it fresh with correct attributes
+		frappe.get_doc({
+		    "doctype": "Item",
+		    "item_code": "Subcontracted FG",
+		    "item_name": "Subcontracted FG",
+		    "is_stock_item": 0,
+		    "is_sub_contracted_item": 1,
+		    "stock_uom": "Nos",
+		    "default_warehouse": default_wh,
+		    "gst_hsn_code": "01011010",
+			 "include_item_in_manufacturing": 1
+		}).insert(ignore_permissions=True)
+
+
+		# Create the raw material item manually
+		if not frappe.db.exists("Item", "Sub Raw Bom Mat"):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "Sub Raw Bom Mat",
+				"item_name": "Sub Raw Bom Mat",
+				"is_stock_item": 1,
+				 "is_sub_contracted_item": 1,
+				"stock_uom": "Nos",
+				"default_warehouse": default_wh,
+				"gst_hsn_code": "01011010",
+			}).insert(ignore_permissions=True)
+
+		# Create the raw material item manually
+		if not frappe.db.exists("Item", "_Test Item"):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "_Test Item",
+				"item_name": "_Test Item",
+				"is_stock_item": 1,
+				"gst_hsn_code": "01011010",
+				"valuation_rate":100
+			}).insert(ignore_permissions=True)	
+
+		# Create the raw material item manually
+		if not frappe.db.exists("Item", "Sub Raw Mat"):
+			frappe.get_doc({
+				"doctype": "Item",
+				"item_code": "Sub Raw Mat",
+				"item_name": "Sub Raw Mat",
+				"is_stock_item": 1,
+				"stock_uom": "Nos",
+				"default_warehouse": default_wh,
+				"gst_hsn_code": "01011010",
+			}).insert(ignore_permissions=True)	
+
+		if not frappe.db.exists("BOM", {"item": "Sub Raw Bom Mat", "is_active": 1}):
+			bom = frappe.get_doc({
+				"doctype": "BOM",
+				"item": "Sub Raw Bom Mat",
+				"company": "_Test Company",
+				"is_active": 1,
+				"is_default": 1,
+				"quantity": 1,
+				"items": [{"item_code": "Sub Raw Mat", "qty": 2}],
+			}).insert()
+			bom.submit()
+		if not frappe.db.exists("Supplier", "_Test Supplier"):
+			frappe.get_doc({
+				"doctype": "Supplier",
+				"supplier_name": "_Test Supplier",
+				"supplier_type": "Company"
+			}).insert()
+
+		# Create a Purchase Order to be used for Subcontracting Order
+		po = frappe.get_doc({
+    			"doctype": "Purchase Order",
+    			"supplier": "_Test Supplier",
+    			"company": "_Test Company",
+    			"schedule_date": frappe.utils.nowdate(),
+				"is_subcontracted":1,
+    			"subcontracting_type": "Raw Material Supplied",
+    			"items": [
+    			    {
+    			        "fg_item": "Sub Raw Bom Mat",
+						"item_code":"Subcontracted FG",
+    			        "qty": 5,
+    			        "rate": 100,
+    			        "warehouse": default_wh,
+						"is_finished_item": 1
+    			    }
+    			],
+    			"supplied_items": [
+    			    {
+    			        "main_item_code": "Subcontracted FG",
+    			        "rm_item_code": "Sub Raw Mat",
+    			        "required_qty": 10,
+    			        "warehouse": default_wh
+    			    }
+    			]
+		}).insert()
+		po.submit()
+
+		# Create Subcontracting Order
+		from erpnext.subcontracting.doctype.subcontracting_order.test_subcontracting_order import create_subcontracting_order
+		sco = create_subcontracting_order(po_name=po.name, supplier_warehouse=subcontract_wh)
+		sco.supplier_warehouse = subcontract_wh
+		sco.save()
+		sco.submit()
+
+
+
+		# Create target_doc (empty Stock Entry)
+		stock_entry = make_stock_entry(item_code="_Test Item",qty=1,source=default_wh,target=default_wh,purpose="Material Transfer",company = "_Test Company",purchase_order = po.name)
+		
+		stock_entry_json = frappe.as_json(stock_entry)
+
+
+		# Call the function under test
+		result_doc = get_items_from_subcontract_order(sco.name, stock_entry_json)
+
+		# Assertions
+		self.assertEqual(result_doc.doctype, "Stock Entry")
+		self.assertGreater(len(result_doc.items), 0)
+		self.assertEqual(result_doc.items[0].item_code, "Sub Raw Mat")
+
+def create_bom(bom_item, rm_items, company=None, qty=None, properties=None):
+	bom = frappe.new_doc("BOM")
+	bom.update(
+		{
+			"item": bom_item or "_Test Item",
+			"company": company or "_Test Company",
+			"quantity": qty or 1,
+		}
+	)
+	if properties:
+		bom.update(properties)
+	for item in rm_items:
+		item_args = {}
+		item_args.update(
+			{
+				"item_code": item.get('item_code'),
+				"qty": item.get('qty'),
+				"uom": item.get('uom'),
+				"rate": item.get('rate')
+			}
+		)
+		bom.append("items", item_args)
+	bom.save(ignore_permissions=True)
+	bom.submit()
+	return bom
 
 
 def make_serialized_item(**args):
@@ -5119,7 +5570,7 @@ def create_company_se():
 	return company_name
 
 
-def create_serial_and_batch_bundle():
+def custom_create_serial_and_batch_bundle():
 	# Create Item Group if needed
 	if not frappe.db.exists("Item Group", "Test Group"):
 		frappe.get_doc({

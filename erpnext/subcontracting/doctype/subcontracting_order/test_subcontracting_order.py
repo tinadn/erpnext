@@ -728,6 +728,9 @@ def create_subcontracting_order(**args):
 	if len(warehouses) == 1:
 		sco.set_warehouse = next(iter(warehouses))
 
+	if args.supplier_warehouse:
+		sco.supplier_warehouse = args.supplier_warehouse
+
 	if not args.do_not_save:
 		sco.insert()
 		if not args.do_not_submit:
