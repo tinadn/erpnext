@@ -1,5 +1,6 @@
 import unittest
 import frappe
+from frappe.tests.utils import change_settings
 
 class TestSupplierSalesAnalyticsReport(unittest.TestCase):
     def setUp(self):
@@ -36,6 +37,7 @@ class TestSupplierSalesAnalyticsReport(unittest.TestCase):
         self.pi2.flags.ignore_validate_update_after_submit = True
         self.pi2.submit()
 
+    @change_settings("Repost Accounting Ledger Settings",{"allowed_types": [{"document_type": "Purchase Invoice", "allowed": 1}]})
     def test_supplier_filter_and_invoice_handling(self):
         from erpnext.stock.report.supplier_wise_sales_analytics.supplier_wise_sales_analytics import get_suppliers_details
 
@@ -44,6 +46,6 @@ class TestSupplierSalesAnalyticsReport(unittest.TestCase):
 
         self.assertIn(self.item1.name, supplier_map, f"{self.item1.name} should appear for {self.supplier_a.name}")
         self.assertNotIn(self.item2.name, supplier_map, f"{self.item2.name} should not appear for {self.supplier_a.name}")
-        
+
     def tearDown(self):
          frappe.db.rollback()
