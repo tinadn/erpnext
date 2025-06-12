@@ -39,6 +39,8 @@ class TestStockReservationEntry(FrappeTestCase):
 
 		if not frappe.db.exists("Company", "_Test Company"):
 			create_company("_Test Company")
+		
+		frappe.set_user("Administrator")
 
 		"""Test warehouse creation with valid inputs."""
 		self.warehouse = create_warehouse("_Test Warehouse", company="_Test Company")
