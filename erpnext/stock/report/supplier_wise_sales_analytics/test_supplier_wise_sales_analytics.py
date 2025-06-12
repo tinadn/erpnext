@@ -1,12 +1,21 @@
 import unittest
 import frappe
-from frappe.tests.utils import change_settings
 
 class TestSupplierSalesAnalyticsReport(unittest.TestCase):
     def setUp(self):
         frappe.set_user("Administrator")
 
-        # Create two suppliers
+        # ✅ Enable reposting before invoice submission
+        settings = frappe.get_single("Repost Accounting Ledger Settings")
+        if frappe.meta.has_field("Repost Accounting Ledger Settings", "allowed_types"):
+            if not any(d.document_type == "Purchase Invoice" for d in settings.allowed_types):
+                settings.append("allowed_types", {
+                    "document_type": "Purchase Invoice",
+                    "allowed": 1
+                })
+                settings.save(ignore_permissions=True)
+
+        # Create test records
         from erpnext.buying.doctype.supplier.test_supplier import create_supplier
         from erpnext.stock.doctype.item.test_item import create_item
         from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import make_purchase_invoice
@@ -24,7 +33,6 @@ class TestSupplierSalesAnalyticsReport(unittest.TestCase):
             qty=2,
             rate=100
         )
-        self.pi1.flags.ignore_validate_update_after_submit = True
         self.pi1.submit()
 
         self.pi2 = make_purchase_invoice(
@@ -34,10 +42,8 @@ class TestSupplierSalesAnalyticsReport(unittest.TestCase):
             qty=3,
             rate=150
         )
-        self.pi2.flags.ignore_validate_update_after_submit = True
         self.pi2.submit()
 
-    @change_settings("Repost Accounting Ledger Settings",{"allowed_types": [{"document_type": "Purchase Invoice", "allowed": 1}]})
     def test_supplier_filter_and_invoice_handling(self):
         from erpnext.stock.report.supplier_wise_sales_analytics.supplier_wise_sales_analytics import get_suppliers_details
 
@@ -48,4 +54,4 @@ class TestSupplierSalesAnalyticsReport(unittest.TestCase):
         self.assertNotIn(self.item2.name, supplier_map, f"{self.item2.name} should not appear for {self.supplier_a.name}")
 
     def tearDown(self):
-         frappe.db.rollback()
+        frappe.db.rollback()
