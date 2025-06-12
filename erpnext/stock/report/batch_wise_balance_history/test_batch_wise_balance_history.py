@@ -5,14 +5,13 @@ from frappe.utils import getdate, nowdate, add_days, now_datetime
 from erpnext.stock.doctype.item.test_item import create_item
 from erpnext.stock.doctype.stock_entry.test_stock_entry import make_stock_entry
 from erpnext.stock.report.batch_wise_balance_history import batch_wise_balance_history
-from erpnext.stock.doctype import repost_item_valuation
-import importlib
+# 🔥 REMOVE THIS LINE: from erpnext.stock.doctype import repost_item_valuation
+# 🔥 REMOVE THIS LINE: import importlib
 
 
 class TestBatchWiseBalanceHistoryReport(unittest.TestCase):
     def setUp(self):
-        super().setUp()
-        importlib.reload(repost_item_valuation)
+
         self.item = create_item(item_code="Test Batch Item", is_stock_item=1, valuation_rate=100)
         self.item.has_batch_no = 1
         self.item.save()
@@ -86,7 +85,7 @@ class TestBatchWiseBalanceHistoryReport(unittest.TestCase):
         self.assertEqual(record[4], self.batch)
         self.assertEqual(record[6], 15)  # In Qty
         self.assertEqual(record[7], 3)   # Out Qty
-        self.assertEqual(record[8], 12)  # Balance Qty = 10 + 5 - 3
+        self.assertEqual(record[8], 12)  # Balance Qty
 
     def test_invalid_date_range_T_BWBH_002(self):
         filters = _dict({
@@ -97,12 +96,11 @@ class TestBatchWiseBalanceHistoryReport(unittest.TestCase):
             batch_wise_balance_history.execute(filters)
 
     def test_missing_required_filters_T_BWBH_003(self):
-        # More than 100k entries case can't be triggered easily, just check missing filters
         filters = _dict({
             "from_date": self.from_date,
             "to_date": self.to_date,
         })
-        batch_wise_balance_history.execute(filters)  # Should not raise error
+        batch_wise_balance_history.execute(filters)
 
     def test_report_with_no_data_T_BWBH_004(self):
         filters = _dict({
