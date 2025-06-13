@@ -3,17 +3,17 @@ import frappe
 
 class TestSupplierSalesAnalyticsReport(unittest.TestCase):
     def setUp(self):
-        frappe.set_user("Administrator")
-
-        # ✅ Enable reposting before invoice submission
-        settings = frappe.get_single("Repost Accounting Ledger Settings")
-        if frappe.meta.has_field("Repost Accounting Ledger Settings", "allowed_types"):
-            if not any(d.document_type == "Purchase Invoice" for d in settings.allowed_types):
-                settings.append("allowed_types", {
-                    "document_type": "Purchase Invoice",
-                    "allowed": 1
-                })
-                settings.save(ignore_permissions=True)
+		frappe.set_user("Administrator")
+		from frappe.model.meta import get_meta
+		meta = get_meta("Repost Accounting Ledger Settings")
+		settings = frappe.get_single("Repost Accounting Ledger Settings")
+		if any(df.fieldname == "allowed_types" for df in meta.get("fields")):
+			if not any(d.document_type == "Purchase Invoice" for d in settings.allowed_types):
+				settings.append("allowed_types", {
+					"document_type": "Purchase Invoice",
+					"allowed": 1
+				})
+				settings.save(ignore_permissions=True)
 
         # Create test records
         from erpnext.buying.doctype.supplier.test_supplier import create_supplier
