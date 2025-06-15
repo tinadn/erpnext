@@ -15,7 +15,7 @@ class PackingSlip(StatusUpdater):
 
 	from typing import TYPE_CHECKING
 
-	if TYPE_CHECKING:
+	if TYPE_CHECKING: # pragma: no cover
 		from frappe.types import DF
 
 		from erpnext.stock.doctype.packing_slip_item.packing_slip_item import PackingSlipItem
@@ -213,11 +213,11 @@ class PackingSlip(StatusUpdater):
 			self.gross_weight_pkg = self.net_weight_pkg
 
 
+	
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def item_details(doctype, txt, searchfield, start, page_len, filters):
 	from erpnext.controllers.queries import get_match_cond
-
 	return frappe.db.sql(
 		"""
 		SELECT name, item_name, description
