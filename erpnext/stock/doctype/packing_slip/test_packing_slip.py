@@ -106,12 +106,15 @@ class TestPackingSlip(FrappeTestCase):
 
 	def test_validate_delivery_note_raises_on_non_draft_dn_TC_SCK_418(self):
 		from erpnext.accounts.doctype.account.test_account import create_account
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_customer
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 
 		make_item(
 			"_Test Item",
 		)
+
+		customer = create_customer(customer_name="_Test Customer")
 
 		parent_expenses = frappe.db.get_value(
 			"Account", {"account_name": "Expenses", "company": "_Test Company", "is_group": 1}, "name"
@@ -154,7 +157,11 @@ class TestPackingSlip(FrappeTestCase):
 
 		# Step 1: Create and submit a Delivery Note (so docstatus = 1)
 		dn = create_delivery_note(
-			qty=1, warehouse=warehouse, cost_center=cost_center, expense_account=expense_account
+			qty=1,
+			warehouse=warehouse,
+			cost_center=cost_center,
+			expense_account=expense_account,
+			customer=customer,
 		)
 		dn.submit()
 
@@ -164,17 +171,20 @@ class TestPackingSlip(FrappeTestCase):
 
 		# Step 3: Call validate_delivery_note and expect ValidationError
 
-		with self.assertRaises(frappe.ValidationError):
+		with self.assertRaises(frappe.ValidationError, msg="only be created for Draft Delivery Note"):
 			ps.validate_delivery_note()
 
 	def test_validate_case_nos_from_case_no_zero_TC_SCK_419(self):
 		from erpnext.accounts.doctype.account.test_account import create_account
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_customer
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 
 		make_item(
 			"_Test Item",
 		)
+
+		customer = create_customer(customer_name="_Test Customer")
 
 		parent_expenses = frappe.db.get_value(
 			"Account", {"account_name": "Expenses", "company": "_Test Company", "is_group": 1}, "name"
@@ -217,7 +227,11 @@ class TestPackingSlip(FrappeTestCase):
 
 		# Step 1: Create and submit a Delivery Note (so docstatus = 1)
 		self.dn = create_delivery_note(
-			qty=1, warehouse=warehouse, cost_center=cost_center, expense_account=expense_account
+			qty=1,
+			warehouse=warehouse,
+			cost_center=cost_center,
+			expense_account=expense_account,
+			customer=customer,
 		)
 		ps = frappe.new_doc("Packing Slip")
 		ps.delivery_note = self.dn.name
@@ -229,12 +243,15 @@ class TestPackingSlip(FrappeTestCase):
 
 	def test_validate_case_nos_to_less_than_from_TC_SCK_420(self):
 		from erpnext.accounts.doctype.account.test_account import create_account
+		from erpnext.accounts.doctype.sales_invoice.test_sales_invoice import create_customer
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 
 		make_item(
 			"_Test Item",
 		)
+
+		customer = create_customer(customer_name="_Test Customer")
 
 		parent_expenses = frappe.db.get_value(
 			"Account", {"account_name": "Expenses", "company": "_Test Company", "is_group": 1}, "name"
@@ -277,7 +294,11 @@ class TestPackingSlip(FrappeTestCase):
 
 		# Step 1: Create and submit a Delivery Note (so docstatus = 1)
 		self.dn = create_delivery_note(
-			qty=1, warehouse=warehouse, cost_center=cost_center, expense_account=expense_account
+			qty=1,
+			warehouse=warehouse,
+			cost_center=cost_center,
+			expense_account=expense_account,
+			customer=customer,
 		)
 		ps = frappe.new_doc("Packing Slip")
 		ps.delivery_note = self.dn.name
