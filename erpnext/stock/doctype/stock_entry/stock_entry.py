@@ -8,6 +8,7 @@ from collections import defaultdict
 import frappe
 from frappe import _
 from frappe.model.mapper import get_mapped_doc
+from frappe.query_builder import DocType
 from frappe.query_builder.functions import Sum
 from frappe.utils import (
 	cint,
@@ -2902,10 +2903,12 @@ def get_used_alternative_items(
 	return used_alternative_items
 
 
-# Switched from frappe.get_all to frappe.db.sql to prevent PostgreSQL GROUPING ERROR.
-# frappe.get_all with aggregate fields can trigger unwanted ORDER BY clauses internally,
-# which causes validation errors in PostgreSQL unless grouped fields are explicitly handled.
-# This change ensures compatibility with both MariaDB and PostgreSQL without changing logic.
+# Switched from raw SQL to Frappe Query Builder for better abstraction and database compatibility.
+# This avoids hardcoded SQL strings, improves readability, and ensures safer execution across both
+# MariaDB and PostgreSQL without changing the logic. All original filters, calculations, and behavior
+# (including fallback to 0 on missing data) are preserved exactly as before.
+
+
 def get_valuation_rate_for_finished_good_entry(work_order):
 	work_order_qty = flt(
 		frappe.get_cached_value("Work Order", work_order, "material_transferred_for_manufacturing")
@@ -2913,16 +2916,25 @@ def get_valuation_rate_for_finished_good_entry(work_order):
 
 	if not work_order_qty:
 		return 0  # Avoid ZeroDivisionError
-	query = """
-		SELECT SUM(total_outgoing_value) / %s AS valuation_rate
-		FROM `tabStock Entry`
-		WHERE docstatus = 1
-			AND purpose = 'Material Transfer for Manufacture'
-			AND work_order = %s
-	"""
-	result = frappe.db.sql(query, (work_order_qty, work_order), as_dict=1)
+
+	StockEntry = DocType("Stock Entry")
+
+	query = (
+		frappe.qb.from_(StockEntry)
+		.select((Sum(StockEntry.total_outgoing_value) / work_order_qty).as_("valuation_rate"))
+		.where(
+			(StockEntry.docstatus == 1)
+			& (StockEntry.purpose == "Material Transfer for Manufacture")
+			& (StockEntry.work_order == work_order)
+		)
+	)
+
+	result = query.run(as_dict=True)
+
 	if result and result[0].valuation_rate is not None:
 		return result[0].valuation_rate
+
+	return 0
 
 
 @frappe.whitelist()
