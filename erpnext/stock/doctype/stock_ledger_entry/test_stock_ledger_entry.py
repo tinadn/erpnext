@@ -1466,16 +1466,6 @@ class TestStockLedgerEntry(FrappeTestCase, StockTestMixin):
 		# Simulate a Stock Ledger Entry for a backdated transaction
 		frappe.set_user(test_user)
 
-		# Get actual last transaction time
-		frappe.db.sql(
-			"""
-			SELECT MAX((posting_date || ' ' || posting_time)::timestamp)
-			FROM `tabStock Ledger Entry`
-			WHERE docstatus = 1 AND is_cancelled = 0 AND item_code = %s AND warehouse = %s
-		""",
-			(item_code, warehouse),
-		)[0][0]
-
 		# Use earlier posting date/time to simulate backdated entry
 		backdated_sle = frappe.new_doc("Stock Ledger Entry")
 		backdated_sle.item_code = item_code
