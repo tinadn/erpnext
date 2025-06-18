@@ -1485,7 +1485,7 @@ class TestPickList(FrappeTestCase):
 		self.assertEqual(sales_order.status, "Completed")  
 		self.assertEqual(delivery_note.status, "Completed") 
 
-	def test_update_stock_entry_items_with_no_reference_TC_SCK_PL(self):
+	def test_update_stock_entry_items_with_no_reference_TC_SCK_462(self):
 		from erpnext.stock.doctype.pick_list.pick_list import update_stock_entry_items_with_no_reference
 		from erpnext.stock.doctype.stock_entry.stock_entry import StockEntry
 		from erpnext.stock.doctype.pick_list.pick_list import update_common_item_properties
@@ -1544,7 +1544,7 @@ class TestPickList(FrappeTestCase):
 		self.assertEqual(updated_entry.items[1].item_code, "_Test Item 2")
 		self.assertListEqual(called_items, ["_Test Item", "_Test Item 2"])
 	
-	def test_update_stock_entry_based_on_work_order_TC_SCK_PL(self):
+	def test_update_stock_entry_based_on_work_order_TC_SCK_463(self):
 		from erpnext.stock.doctype.pick_list.pick_list import update_stock_entry_based_on_work_order
 		from erpnext.manufacturing.doctype.production_plan.test_production_plan import make_bom 
 		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
@@ -1625,7 +1625,7 @@ class TestPickList(FrappeTestCase):
 		self.assertIn(raw_item, called_items)
 
 
-	def test_get_item_details_TC_SCK_ITEM_DETAILS(self):
+	def test_get_item_details_TC_SCK_464(self):
 		from erpnext.regional.doctype.import_supplier_invoice.import_supplier_invoice import create_uom
 		from erpnext.stock.doctype.item.test_item import make_item
 		from erpnext.stock.doctype.pick_list.pick_list import get_item_details
@@ -1659,7 +1659,7 @@ class TestPickList(FrappeTestCase):
 		self.assertIn("conversion_factor", result_with_uom)
 		self.assertEqual(result_with_uom.conversion_factor, 10)
 
-	def test_update_picked_item_from_current_pick_list_TC_SCK_PICKED(self):
+	def test_update_picked_item_from_current_pick_list_TC_SCK_465(self):
 		from frappe.utils import nowdate
 
 		# Setup dummy Pick List with 2 locations
