@@ -207,6 +207,7 @@ class TestAvailableBatchReport(FrappeTestCase):
 			# "qty": 50,
 		}).insert()
 
+
 		# # Create Stock Entry with Serial and Batch Bundle
 		# stock_entry = frappe.get_doc({
 		# 	"doctype": "Stock Entry",
