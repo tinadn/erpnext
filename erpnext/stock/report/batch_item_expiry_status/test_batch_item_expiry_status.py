@@ -33,19 +33,19 @@ class TestBatchItemExpiryStatusReport(frappe.tests.utils.FrappeTestCase):
 			batch_no=self.batch,
 		)
 
-	def test_missing_all_filters_T_BTES_001(self):
-		with self.assertRaises(frappe.ValidationError, msg="Expected error for missing all filters"):
+	def test_missing_all_filters(self):
+		with self.assertRaises(frappe.ValidationError, msg="Please select the required filters"):
 			execute({})
 
-	def test_missing_from_date_T_BTES_002(self):
-		with self.assertRaises(frappe.ValidationError, msg="Expected error for missing from_date"):
+	def test_missing_from_date(self):
+		with self.assertRaises(frappe.ValidationError, msg="'From Date' is required"):
 			execute({"to_date": today()})
 
-	def test_missing_to_date_T_BTES_003(self):
-		with self.assertRaises(frappe.ValidationError, msg="Expected error for missing to_date"):
+	def test_missing_to_date(self):
+		with self.assertRaises(frappe.ValidationError, msg="'To Date' is required"):
 			execute({"from_date": today()})
 
-	def test_report_returns_batch_within_date_range_T_BTES_004(self):
+	def test_report_returns_batch_within_date_range(self):
 		filters = {
 			"from_date": add_days(today(), -30),
 			"to_date": add_days(today(), 30),
@@ -56,7 +56,7 @@ class TestBatchItemExpiryStatusReport(frappe.tests.utils.FrappeTestCase):
 			f"Expected item '{self.item.name}' not found in report data",
 		)
 
-	def test_report_filters_by_item_T_BTES_005(self):
+	def test_report_filters_by_item(self):
 		# This should return data
 		filters = {
 			"from_date": add_days(today(), -1),
