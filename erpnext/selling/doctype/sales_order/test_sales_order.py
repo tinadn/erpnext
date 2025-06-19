@@ -7056,6 +7056,7 @@ class TestSalesOrder(AccountsTestMixin, FrappeTestCase):
 
 		create_registered_company()
 		create_registered_customer()
+		create_registered_address_for_gst_entities()
 		get_or_create_fiscal_year("_Test Indian Registered Company")
 		create_test_warehouse(
 			name="Stores - _TIRC", warehouse_name="Stores", company="_Test Indian Registered Company"
@@ -8425,6 +8426,34 @@ def create_registered_customer():
 			}
 		)
 		address.insert()
+
+
+def create_registered_address_for_gst_entities():
+	if not frappe.db.exists("Address", "_Test Indian Registered Company-Billing"):
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"name": "_Test Indian Registered Company-Billing",
+				"address_title": "_Test Indian Registered Company",
+				"address_type": "Billing",
+				"address_line1": "Test Address - 1",
+				"city": "Test City",
+				"state": "Gujarat",
+				"pincode": "380015",
+				"country": "India",
+				"gstin": "24AAQCA8719H1ZC",
+				"gst_category": "Registered Regular",
+				"is_primary_address": 1,
+				"is_company_address": 1,
+				"is_shipping_address": 1,
+				"links": [
+					{"link_doctype": "Company", "link_name": "_Test Indian Registered Company"},
+					{"link_doctype": "Customer", "link_name": "_Test Registered Customer"},
+					{"link_doctype": "Customer", "link_name": "_Test Registered Composition Customer"},
+				],
+			}
+		)
+		address.insert(ignore_permissions=True)
 
 
 def create_exchange_rate(date):
