@@ -1700,7 +1700,6 @@ def get_serial_and_batch_ledger(**kwargs):
 			serial_batch_table.batch_no,
 			serial_batch_table.qty,
 			serial_batch_table.incoming_rate,
-			serial_batch_table.voucher_detail_no,
 		)
 		.where(
 			(sle_table.item_code == kwargs.item_code)
@@ -1708,7 +1707,6 @@ def get_serial_and_batch_ledger(**kwargs):
 			& (serial_batch_table.is_outward == 0)
 		)
 	)
-
 	if kwargs.serial_nos:
 		query = query.where(serial_batch_table.serial_no.isin(kwargs.serial_nos))
 

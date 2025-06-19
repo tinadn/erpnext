@@ -568,10 +568,10 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		if not frappe.db.exists("Company", company):
 			create_child_company()
 
-		if not frappe.db.exists("Warehouse", "_Test Warehouse - _TC"):
+		if not frappe.db.exists("Warehouse", warehouse):
 			warehouse = frappe.get_doc({
 				"doctype": "Warehouse",
-				"warehouse_name": "_Test Warehouse - _TC",
+				"warehouse_name": warehouse,
 				"company": company
 			}).insert()
 
@@ -623,20 +623,79 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			stock_entry.submit()
 		else:
 			stock_entry = frappe.get_doc("Stock ENtry", item.name)
-		
+		# Create Delivery Note
+		dn = frappe.get_doc({
+			"doctype": "Delivery Note",
+			"customer": customer,
+			"company": company,
+			"posting_date": frappe.utils.nowdate(),
+			"currency": "INR",
+			"items": [{
+				"item_code": item.name,
+				"qty": 1,
+				"allow_zero_valuation_rate": 1,
+				"warehouse": warehouse,
+				"serial_no": serial_no.name,
+				"batch_no": batch.name
+			}]
+		}).insert(ignore_permissions=True)
+		dn.submit()
+		assert dn.docstatus == 1
+		assert dn.items[0].serial_no == serial_no.name
+
+		# Manually create Stock Ledger Entry (optional for test purposes)
+		sle = frappe.get_doc({
+			"doctype": "Stock Ledger Entry",
+			"item_code": item.name,
+			"warehouse": warehouse,
+			"posting_date": dn.posting_date,
+			"posting_time": frappe.utils.nowtime(),
+			"voucher_type": "Delivery Note",
+			"voucher_no": dn.name,
+			"voucher_detail_no": dn.items[0].name,
+			"actual_qty": -1,
+			"stock_uom": "Nos",
+			"company": company,
+			"batch_no": batch.name,
+			"serial_no": serial_no.name
+		})
+		sle.insert(ignore_permissions=True)
+
+		serial_batch_bundle = frappe.get_doc({
+			"doctype": "Serial and Batch Bundle",
+			"item_code": item.name,
+			"warehouse": warehouse,
+			"company": company,
+			"type_of_transaction": "Inward",
+			"has_serial_no": 1,
+			"has_batch_no": 1,
+			"naming_series": "TESTSERIES",
+			"voucher_detail_no": dn.items[0].name,
+			"entries": [{
+				"serial_no": serial_no.name,
+				"batch_no": batch.name,
+				"qty": 1,
+				"warehouse": warehouse
+			}],
+			"voucher_type": "Delivery Note",
+			"voucher_no": dn.name,
+			"posting_date": frappe.utils.now(),
+		}).insert(ignore_permissions=True)
+
 		args = {
-					"item_code": item.item_code,
-					"warehouse": warehouse,
-					"serial_nos":item.has_serial_no,
-					"batch_nos": item.has_batch_no,
-					"fetch_incoming_rate":10,
-					"serial_nos":serial_no,
-					"qty": 5,
-					"based_on": "FIFO",
-					"posting_date": frappe.utils.now(),
- 					"posting_time": frappe.utils.now()
-				}
+			"item_code": sle.item_code,
+			"warehouse": sle.warehouse,
+			"serial_nos":[serial_no.name],
+			"batch_nos": [batch.name],
+			"fetch_incoming_rate": 10,
+			"qty": 5,
+			"based_on": "FIFO",
+			"posting_date": frappe.utils.now(),
+			"posting_time": frappe.utils.now()
+		}
 		get_serial_and_batch_ledger=get_serial_and_batch_ledger(**args)
+		excepted=[{'serial_no': 'MDC0101', 'warehouse': 'Stores - _TIRC', 'batch_no': 'Batch_0101', 'qty': 1.0, 'incoming_rate': 0.0}]
+		self.assertEqual(get_serial_and_batch_ledger,excepted)
 
 	# codecov
 	def test_item_query_filters_TC_SCK_289(self):
@@ -920,7 +979,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"company": company,
 			"items": [{
 				"item_code": item.name,
-				"qty": 1,
+				"qty": 100,
 				"s_warehouse": None,
 				"t_warehouse": warehouse,
 				"serial_no": "MDC0101",
@@ -961,7 +1020,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"voucher_type": "Delivery Note",
 			"voucher_no": dn.name,
 			"voucher_detail_no": dn.items[0].name,
-			"actual_qty": -1,
+			"actual_qty": 100,
 			"stock_uom": "Nos",
 			"company": company,
 			"batch_no": batch.name,
@@ -969,7 +1028,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		})
 		sle.insert(ignore_permissions=True)
 		assert sle.voucher_no == dn.name
-		assert sle.actual_qty == -1
+		assert sle.actual_qty == 15
 
 		# Create Serial and Batch Bundle
 		serial_batch_bundle = frappe.get_doc({
@@ -985,9 +1044,10 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"entries": [{
 				"serial_no": serial_no.name,
 				"batch_no": batch.name,
-				"qty": 1,
+				"qty": 100,
 				"warehouse": warehouse
 			}],
+			"total_qty":100,
 			"voucher_type": "Delivery Note",
 			"voucher_no": dn.name,
 			"posting_date": frappe.utils.now(),
@@ -1008,7 +1068,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"entries": [{
 				"serial_no": serial_no.name,
 				"batch_no": batch.name,
-				"qty": 1,
+				"qty": 100,
 				"warehouse": warehouse
 			}],
 			"voucher_type": "Stock Entry",
@@ -1032,6 +1092,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 				"qty": 1,
 				"warehouse": warehouse
 			}],
+			"total_qty":100,
 			"voucher_type": "Stock Entry",
 			"voucher_no": stock_entry.name,
 			"posting_date": frappe.utils.now(),
