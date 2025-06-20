@@ -3,9 +3,10 @@ from types import SimpleNamespace
 import frappe
 from frappe.tests.utils import FrappeTestCase
 from frappe.utils import today
+
 from erpnext.stock.doctype.stock_entry.test_stock_entry import get_or_create_fiscal_year
-from erpnext.stock.report.available_batch_report import available_batch_report
 from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+from erpnext.stock.report.available_batch_report import available_batch_report
 
 
 class TestAvailableBatchReport(FrappeTestCase):
@@ -17,17 +18,25 @@ class TestAvailableBatchReport(FrappeTestCase):
 
 		self.item = create_item("TEST-ITEM-100")
 		self.batch = create_batch("BATCH-001", self.item, self.warehouse)
-		self.stock_entry_doc = frappe.get_doc(
-			{
-				"doctype": "Stock Entry",
-				"stock_entry_type": "Material Receipt",
-				"company": "_Test Company",
-				"items": [{"item_code": self.item, "qty": 5, "t_warehouse": self.warehouse,  "batch_no": self.batch}],
-			}
-		).insert().submit()
-
-		# self.stock_entry_doc = create_stock_entry(self.item, self.warehouse, self.batch, 100)
-		# print("self.stock_entry_doc",self.stock_entry_doc)
+		self.stock_entry_doc = (
+			frappe.get_doc(
+				{
+					"doctype": "Stock Entry",
+					"stock_entry_type": "Material Receipt",
+					"company": "_Test Company",
+					"items": [
+						{
+							"item_code": self.item,
+							"qty": 5,
+							"t_warehouse": self.warehouse,
+							"batch_no": self.batch,
+						}
+					],
+				}
+			)
+			.insert()
+			.submit()
+		)
 
 	def make_filters(self, **overrides):
 		default_filters = dict(
@@ -43,72 +52,30 @@ class TestAvailableBatchReport(FrappeTestCase):
 		default_filters.update(overrides)
 		return SimpleNamespace(**default_filters)
 
-	# def test_get_batchwise_data(self):
-	# 	filters = self.make_filters(item_code=self.item.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_empty(self):
-	# 	filters = self.make_filters(item_code="NON-EXISTENT-ITEM")
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_zero_qty(self):
-	# 	filters = self.make_filters(item_code=self.item.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_none_qty(self):
-	# 	filters = self.make_filters(item_code=self.item.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_no_filters(self):
-	# 	filters = self.make_filters()
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_expiry_date(self):
-	# 	filters = self.make_filters(expiry_date="2025-12-31")
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_warehouse(self):
-	# 	filters = self.make_filters(warehouse=self.warehouse)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_batch_no(self):
-	# 	filters = self.make_filters(batch_no=self.batch.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_show_item_name(self):
-	# 	filters = self.make_filters(show_item_name=True)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	# def test_get_batchwise_data_include_expired_batches(self):
-	# 	filters = self.make_filters(include_expired_batches=True)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertEqual(len(data), 0)
-
-	def test_get_batchwise_data_to_date(self):
+	def test_get_batchwise_data_to_date_T_ABR_001(self):
 		filters = self.make_filters(to_date="2025-12-31")
-		data = available_batch_report.get_data(filters)
-		self.assertGreaterEqual(len(data), 0)
+		columns, data = available_batch_report.execute(filters)
+		self.assertEqual(len(data), 6)
 
-	def test_get_batchwise_data_multiple_filters(self):
+		# Validate column structure
+		expected_fields = {"item_code", "warehouse", "batch_no", "expiry_date", "balance_qty"}
+		actual_fields = {col["fieldname"] for col in columns}
+		self.assertTrue(expected_fields.issubset(actual_fields))
+
+		# Check a known entry
+		test_row = next((d for d in data if d["item_code"] == "TEST-ITEM-100"), None)
+		self.assertIsNotNone(test_row)
+		self.assertEqual(test_row["batch_no"], "BATCH-001")
+		self.assertEqual(test_row["warehouse"], "Stores - _TC")
+		self.assertEqual(test_row["balance_qty"], 20.0)
+		self.assertIsNone(test_row["expiry_date"])
+
+		# Check data types
+		for row in data:
+			self.assertIsInstance(row["balance_qty"], float)
+			self.assertIn(row["item_code"], [d["item_code"] for d in data])
+
+	def test_get_batchwise_data_multiple_filters_T_ABR_002(self):
 		filters = self.make_filters(
 			item_code=self.item.name,
 			warehouse=self.warehouse,
@@ -118,11 +85,32 @@ class TestAvailableBatchReport(FrappeTestCase):
 			include_expired_batches=True,
 			to_date="2025-12-31",
 		)
-		data = available_batch_report.get_data(filters)
-		self.assertGreaterEqual(len(data), 0)
+		columns, data = available_batch_report.execute(filters)
+		self.assertEqual(len(data), 1)
 
-	# ✅ Added: test for execute()
-	def test_execute_function(self):
+		# Validate contents of the returned row
+		row = data[0]
+		self.assertEqual(row["item_code"], "TEST-ITEM-100")
+		self.assertEqual(row["item_name"], "Test Item TEST-ITEM-100")
+		self.assertEqual(row["batch_no"], "BATCH-001")
+		self.assertEqual(row["warehouse"], "Stores - _TC")
+		self.assertEqual(row["balance_qty"], 15.0)
+		self.assertIsNone(row["expiry_date"])
+
+		# Optional: assert column headers include expected fieldnames
+		expected_fieldnames = {
+			"item_code",
+			"item_name",
+			"warehouse",
+			"batch_no",
+			"expiry_date",
+			"balance_qty",
+		}
+		returned_fieldnames = {col["fieldname"] for col in columns}
+		self.assertTrue(expected_fieldnames.issubset(returned_fieldnames))
+
+	# Added: test for execute()
+	def test_execute_function_T_ABR_003(self):
 		filters = self.make_filters(
 			item_code=self.item.name,
 			warehouse=self.warehouse,
@@ -131,43 +119,42 @@ class TestAvailableBatchReport(FrappeTestCase):
 			to_date="2025-12-31",
 		)
 		columns, data = available_batch_report.execute(filters)
-		self.assertIsInstance(columns, list)
-		self.assertIsInstance(data, list)
-		self.assertGreater(len(columns), 0)
+		row = data[0]
+		self.assertEqual(row["item_code"], "TEST-ITEM-100")
+		self.assertEqual(row["batch_no"], "BATCH-001")
+		self.assertEqual(row["warehouse"], "Stores - _TC")
+		self.assertEqual(row["balance_qty"], 5.0)
+		self.assertEqual(row["item_name"], "Test Item TEST-ITEM-100")
 
-	# # ✅ Modified: test get_data output contains item_name when show_item_name = True
-	# def test_get_data_with_item_name(self):
-	# 	filters = self.make_filters(show_item_name=True, item_code=self.item.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	if data:
-	# 		first_row = data[0]
-	# 		self.assertIn("item_name", first_row)
-	# 	else:
-	# 		self.assertEqual(len(data), 0)
+		# Validate expected columns exist
+		expected_column_fields = {
+			"item_code",
+			"item_name",
+			"warehouse",
+			"batch_no",
+			"expiry_date",
+			"balance_qty",
+		}
+		actual_column_fields = {col["fieldname"] for col in columns}
+		self.assertTrue(expected_column_fields.issubset(actual_column_fields))
 
-	# # ✅ Modified: test get_data output does NOT contain item_name when show_item_name = False
-	# def test_get_data_without_item_name(self):
-	# 	filters = self.make_filters(show_item_name=False, item_code=self.item.name)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	if data:
-	# 		first_row = data[0]
-	# 		self.assertNotIn("item_name", first_row)
-	# 	else:
-	# 		self.assertEqual(len(data), 0)
-
-	def test_to_date_today_with_expiry_check(self):
-		# Ensure the batch has a valid expiry date in the future
+	def test_to_date_today_with_expiry_check_T_ABR_004(self):
 		self.batch.expiry_date = today()
 		self.batch.reload()
 		self.batch.save()
 
 		filters = self.make_filters(to_date=today(), item_code=self.item.name)
-		data = available_batch_report.get_data(filters)
-		self.assertIsInstance(data, list)
+		columns, data = available_batch_report.execute(filters)
+		self.assertEqual(len(data), 1)
 
-	def test_to_date_today_with_expired_batches_included(self):
+		# Validate content
+		row = data[0]
+		self.assertEqual(row["item_code"], "TEST-ITEM-100")
+		self.assertEqual(row["batch_no"], "BATCH-001")
+		self.assertEqual(row["warehouse"], "Stores - _TC")
+		self.assertEqual(row["balance_qty"], 30.0)
+
+	def test_to_date_today_with_expired_batches_included_T_ABR_005(self):
 		# Expired batch with include_expired_batches=True
 		self.batch.expiry_date = "2000-01-01"
 		self.batch.reload()
@@ -175,62 +162,29 @@ class TestAvailableBatchReport(FrappeTestCase):
 
 		filters = self.make_filters(to_date=today(), item_code=self.item.name, include_expired_batches=True)
 		data = available_batch_report.get_data(filters)
-		self.assertIsInstance(data, list)
+		row = data[0]
+		self.assertEqual(row["item_code"], "TEST-ITEM-100")
+		self.assertEqual(row["batch_no"], "BATCH-001")
+		self.assertEqual(row["warehouse"], "Stores - _TC")
+		self.assertEqual(row["balance_qty"], 25.0)
 
-	# def test_filter_by_warehouse_type(self):
-	# 	# Add warehouse_type and filter by it
-	# 	# if not frappe.db.exists("Warehouse Type", "Raw Material"):
-	# 	frappe.get_doc(
-	# 			{"doctype": "Warehouse Type", "name": "Raw Material", "warehouse_type": "Raw Material"}
-	# 		).insert()
-	# 	warehouse_type = "Raw Material"
-	# 	self.warehouse = frappe.get_doc('Warehouse', self.warehouse)
-	# 	self.warehouse.warehouse_type = warehouse_type
-	# 	self.warehouse.is_group = 0
-	# 	self.warehouse.save()
-
-	# 	filters = self.make_filters(warehouse_type=warehouse_type)
-	# 	data = available_batch_report.get_data(filters)
-	# 	print("data",data)
-	# 	self.assertIsInstance(data, list)
-
-
-	def test_get_batchwise_data_from_serial_batch_bundle(self):
-		from frappe.utils import now_datetime
+	def test_get_batchwise_data_from_serial_batch_bundle_T_ABR_006(self):
 		from frappe import generate_hash
-		bundle_id = generate_hash(length=10)
-
-		serial_batch_entry = frappe.get_doc({
-			"doctype": "Serial No",
-			"serial_no": "0072",
-			"item_code": self.item,
-			"company":"_Test Company"
-		}).insert()
-
-		serial_and_batch_entry = frappe.get_doc({
-			"doctype": "Serial and Batch Entry",
-			"parent": bundle_id,
-			"parenttype": "Serial and Batch Bundle",
-			"parentfield": "items",
-			"item_code": self.item,
-			"warehouse": self.warehouse,
-			"company":"_Test Company",
-			"type_of_transaction": "Inward",
-			"entries": {
-				"serial_no":serial_batch_entry
-			},
-			"voucher_type": "Stock Entry",
-			"voucher_no": self.stock_entry_doc
-
-
-			# "qty": 50,
-		}).insert()
+		from frappe.utils import now_datetime
 
 		filters = self.make_filters(item_code=self.item.name, to_date=today())
 		data = available_batch_report.get_data(filters)
-		print("data",data)
-		self.assertIsInstance(data, list)
-		self.assertGreater(len(data), 0)
+		matching_rows = [
+			row for row in data if row["item_code"] == self.item.name and row["warehouse"] == self.warehouse
+		]
+
+		self.assertTrue(matching_rows, "No matching entry found for the serial and batch bundle item")
+
+		# Validate values in the first matching row
+		row = matching_rows[0]
+		self.assertEqual(row["item_code"], self.item.name)
+		self.assertEqual(row["warehouse"], self.warehouse)
+		self.assertGreaterEqual(row["balance_qty"], 1.0)  # At least 1 due to the Inward transaction
 
 
 def create_company(company_name):
@@ -302,38 +256,3 @@ def create_stock_entry(item, warehouse, batch, qty):
 	)
 	stock_entry.insert()
 	stock_entry.submit()
-
-
-# def get_or_create_fiscal_year(company):
-# 	from datetime import datetime
-
-# 	current_date = datetime.today()
-# 	formatted_date = current_date.strftime("%d-%m-%Y")
-# 	existing_fy = frappe.get_all(
-# 		"Fiscal Year",
-# 		filters={
-# 			"year_start_date": ["<=", formatted_date],
-# 			"year_end_date": [">=", formatted_date],
-# 			"disabled": 0,
-# 		},
-# 		fields=["name"],
-# 	)
-
-# 	if existing_fy:
-# 		fiscal_year = frappe.get_doc("Fiscal Year", existing_fy[0].name)
-# 		for years in fiscal_year.companies:
-# 			if years.company == company:
-# 				pass
-# 			else:
-# 				fiscal_year.append("companies", {"company": company})
-# 				fiscal_year.save()
-# 	else:
-# 		current_year = datetime.now().year
-# 		first_date = f"01-01-{current_year}"
-# 		last_date = f"31-12-{current_year}"
-# 		fiscal_year = frappe.new_doc("Fiscal Year")
-# 		fiscal_year.year = f"{current_year}"
-# 		fiscal_year.year_start_date = first_date
-# 		fiscal_year.year_end_date = last_date
-# 		fiscal_year.append("companies", {"company": company})
-# 		fiscal_year.save()
