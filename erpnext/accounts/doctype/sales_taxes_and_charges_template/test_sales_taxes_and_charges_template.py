@@ -28,5 +28,7 @@ class TestSalesTaxesandChargesTemplate(FrappeTestCase):
 		tax_template.title = "__Test Validate Disabled Template_"
 		tax_template.is_default = 1
 		tax_template.disabled = 1
-		with self.assertRaises(frappe.ValidationError, msg="Disabled template must not be default template"):
+
+		with self.assertRaises(frappe.ValidationError) as cm:
 			tax_template.insert(ignore_permissions=True)
+		self.assertIn("Disabled template must not be default template", str(cm.exception))

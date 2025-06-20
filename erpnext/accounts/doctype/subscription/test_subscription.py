@@ -605,8 +605,9 @@ class TestSubscription(FrappeTestCase):
 		get_subscription.cancel_subscription_at_period_end()
 		self.assertEqual(get_subscription.status, "Cancelled")
 
-		with self.assertRaises(frappe.ValidationError, msg="subscription is already cancelled."):
+		with self.assertRaises(frappe.ValidationError) as cm:
 			get_subscription.cancel_subscription()
+		self.assertIn("subscription is already cancelled.", str(cm.exception))
 
 	def test_force_fetch_subscription_updates_TC_ACC_221(self):
 		item = make_test_item("__Test Subscription Item")
@@ -697,11 +698,13 @@ class TestSubscription(FrappeTestCase):
 
 		get_subscription = create_subscription(**args)
 		get_subscription.end_date = today()
-		with self.assertRaises(
-			frappe.ValidationError,
-			msg=f"Subscription End Date must be after {get_subscription.end_date} as per the subscription plan",
-		):
+
+		with self.assertRaises(frappe.ValidationError) as cm:
 			get_subscription.save()
+		self.assertIn(
+			f"Subscription End Date must be after {get_subscription.end_date} as per the subscription plan",
+			str(cm.exception),
+		)
 
 	def test_validate_trial_period_TC_ACC_225(self):
 		item = make_test_item("__Test Subscription Item")
@@ -718,10 +721,10 @@ class TestSubscription(FrappeTestCase):
 
 		get_subscription = create_subscription(**args)
 		get_subscription.trial_period_start = today()
-		with self.assertRaises(
-			frappe.ValidationError, msg="Both Trial Period Start Date and Trial Period End Date must be set"
-		):
+
+		with self.assertRaises(frappe.ValidationError) as cm:
 			get_subscription.save()
+		self.assertIn("Both Trial Period Start Date and Trial Period End Date must be set", str(cm.exception))
 
 	def test_validate_trail_period_start_date_TC_ACC_226(self):
 		item = make_test_item("__Test Subscription Item")
@@ -739,10 +742,10 @@ class TestSubscription(FrappeTestCase):
 		get_subscription = create_subscription(**args)
 		get_subscription.trial_period_start = add_days(today(), 1)
 		get_subscription.trial_period_end = add_days(today(), 2)
-		with self.assertRaises(
-			frappe.ValidationError, msg="Trial Period Start date cannot be after Subscription Start Date"
-		):
+
+		with self.assertRaises(frappe.ValidationError) as cm:
 			get_subscription.save()
+		self.assertIn("Trial Period Start date cannot be after Subscription Start Date", str(cm.exception))
 
 
 def make_plans():
