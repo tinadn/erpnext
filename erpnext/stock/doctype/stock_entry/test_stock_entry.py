@@ -5061,6 +5061,11 @@ class TestStockEntry(FrappeTestCase):
 		if not frappe.db.exists("Item", "Test Item"):
 			make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1, "has_batch_no": 1})
 
+		# Ensure has_batch_no is set even if item existed
+		item = frappe.get_doc("Item", "Test Item")
+		item.has_batch_no = 1
+		item.save()
+
 		# Also insert the corresponding batch
 		if not frappe.db.exists("Batch", "TEST-BATCH-001"):
 			frappe.get_doc(
