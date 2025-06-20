@@ -5959,6 +5959,26 @@ class TestStockEntry(FrappeTestCase):
 		item_code = "Test Stock Transfer Item"
 		make_item(item_code, {"is_stock_item": 1, "valuation_rate": 100})
 
+		# Step 2.5: Add stock to source warehouse
+		frappe.get_doc(
+			{
+				"doctype": "Stock Entry",
+				"stock_entry_type": "Material Receipt",
+				"company": "_Test Company",
+				"items": [
+					{
+						"item_code": item_code,
+						"t_warehouse": source_warehouse,
+						"qty": 10,
+						"uom": "Nos",
+						"stock_uom": "Nos",
+						"conversion_factor": 1.0,
+						"rate": 100,
+					}
+				],
+			}
+		).insert().submit()
+
 		# Step 3: Create outgoing stock entry (Material Transfer)
 		outgoing_entry = frappe.get_doc(
 			{
