@@ -5681,8 +5681,6 @@ class TestPurchaseReceipt(FrappeTestCase):
 			get_billed_qty_against_purchase_receipt,
 			update_billing_percentage,
 		)
-		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
-
 		# --- Setup ---
 		frappe.set_user("Administrator")
 		company = setup_test_company_defaults()
@@ -6284,6 +6282,8 @@ class TestPurchaseReceipt(FrappeTestCase):
 	def test_make_item_gl_entries_creates_valid_gl_entries_TC_SCK_457(self):
 		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
 		from erpnext.regional.doctype.import_supplier_invoice.import_supplier_invoice import create_uom
+		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+
 
 		company = setup_test_company_defaults()
 		company.enable_perpetual_inventory = 1
@@ -6308,15 +6308,7 @@ class TestPurchaseReceipt(FrappeTestCase):
 		)
 
 		pr = make_purchase_receipt(
-			purchase_order=po.name,
-			item_code=item,
-			qty=10,
-			company=company.name,
-			warehouse=warehouse,
-			supplier=supplier.name,
-			do_not_submit=False,
-			rate=100,
-			supplier_warehouse=supplier_warehouse
+			po.name
 		)
 
 		pr.company = company.name

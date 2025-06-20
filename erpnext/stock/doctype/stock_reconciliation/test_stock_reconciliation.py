@@ -38,6 +38,41 @@ class TestStockReconciliation(FrappeTestCase, StockTestMixin):
 		if not frappe.db.exists("Company", "_Test Company"):
 			create_company("_Test Company")
 		
+		company = "_Test Company"
+		company_doc = frappe.get_doc("Company","_Test Company")
+		company_abbr=company_doc.abbr
+		currency = frappe.db.get_value("Company", company, "default_currency") or "INR"
+
+		# Ensure root and stock asset accounts exist
+		root_account = frappe.db.exists("Account", f"Assets - {company_abbr}")
+		if not root_account:
+			root_account = frappe.get_doc({
+		        "doctype": "Account",
+		        "account_name": "Test Assets",
+		        "company": company,
+		        "is_group": 1,
+		        "root_type": "Asset",
+		        "parent_account": frappe.get_all("Account", filters={
+		            "company": company, "is_group": 1, "root_type": "Asset"
+		        }, pluck="name", limit=1)[0],
+		        "account_currency": currency,	
+		    }).insert().name
+
+		stock_account = f"Stock Asset - {company_abbr}"
+		if not frappe.db.exists("Account", stock_account):
+			frappe.get_doc({
+		        "doctype": "Account",
+		        "account_name": "Test Stock Asset",
+		        "company": company,
+		        "parent_account": root_account,
+		        "root_type": "Asset",
+		        "is_group": 0,
+		        "account_currency": currency
+		    }).insert()
+
+		frappe.db.set_value("Company", company, "default_inventory_account", stock_account)
+
+		
 		create_warehouse(warehouse_name="_Test Warehouse",company="_Test Company",)
 
 		create_batch_or_serial_no_items()
@@ -45,6 +80,7 @@ class TestStockReconciliation(FrappeTestCase, StockTestMixin):
 		frappe.db.set_single_value("Stock Settings", "allow_negative_stock", 1)
 
 	def tearDown(self):
+		frappe.db.rollback()
 		frappe.local.future_sle = {}
 		frappe.flags.pop("dont_execute_stock_reposts", None)
 
