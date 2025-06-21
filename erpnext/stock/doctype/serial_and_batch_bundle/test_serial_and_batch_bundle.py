@@ -643,7 +643,6 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		assert dn.docstatus == 1
 		assert dn.items[0].serial_no == serial_no.name
 
-		# Manually create Stock Ledger Entry (optional for test purposes)
 		sle = frappe.get_doc({
 			"doctype": "Stock Ledger Entry",
 			"item_code": item.name,
@@ -660,6 +659,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"serial_no": serial_no.name
 		})
 		sle.insert(ignore_permissions=True)
+		
 
 		serial_batch_bundle = frappe.get_doc({
 			"doctype": "Serial and Batch Bundle",
@@ -1009,6 +1009,23 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		assert dn.docstatus == 1
 		assert dn.items[0].serial_no == serial_no.name
 
+		sle = frappe.get_doc({
+			"doctype": "Stock Ledger Entry",
+			"item_code": item.name,
+			"warehouse": warehouse,
+			"posting_date": dn.posting_date,
+			"posting_time": frappe.utils.nowtime(),
+			"voucher_type": "Delivery Note",
+			"voucher_no": dn.name,
+			"voucher_detail_no": dn.items[0].name,
+			"actual_qty": -1,
+			"stock_uom": "Nos",
+			"company": company,
+			"batch_no": batch.name,
+			"serial_no": serial_no.name
+		})
+		sle.insert(ignore_permissions=True)
+		
 		# Create Serial and Batch Bundle
 		serial_batch_bundle = frappe.get_doc({
 			"doctype": "Serial and Batch Bundle",
