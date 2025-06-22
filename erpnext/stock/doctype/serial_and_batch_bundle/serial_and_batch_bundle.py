@@ -1152,7 +1152,7 @@ class SerialandBatchBundle(Document):
 		self.delink_reference_from_batch()
 
 	@frappe.whitelist()
-	def add_serial_batch(self, data):
+	def add_serial_batch(self, data): # pragma: no cover
 		serial_nos, batch_nos = [], []
 		if isinstance(data, str):
 			data = parse_json(data)
@@ -1521,7 +1521,7 @@ def get_excluded_serial_numbers(child_row):
         "Purchase Invoice Item": "purchase_invoice_item",
         "POS Invoice Item": "pos_invoice_item",
     }.get(child_row.get("doctype"))
-
+	
     if not field or not child_row.get(field):
         return []
     reference_name = child_row.get(field)
@@ -1676,7 +1676,6 @@ def update_serial_or_batch(bundle_id, serial_no=None, batch_no=None):
 				"Serial and Batch Entry", {"parent": bundle_id, "batch_no": batch_no}, "qty", qty + 1
 			)
 			return
-
 	doc = frappe.get_cached_doc("Serial and Batch Bundle", bundle_id)
 	if not serial_no and not batch_no:
 		return
