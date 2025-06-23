@@ -6,6 +6,7 @@ from frappe.utils import nowdate, nowtime
 
 from erpnext.stock.doctype.item.test_item import create_item
 from erpnext.stock.doctype.stock_entry.test_stock_entry import make_stock_entry
+from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
 from erpnext.stock.report.stock_ledger_invariant_check import stock_ledger_invariant_check as report
 
 
@@ -14,7 +15,7 @@ class TestStockLedgerInvariantCheck(unittest.TestCase):
 		frappe.set_user("Administrator")
 
 		self.item = create_item(item_code="_Test Item", is_stock_item=1, valuation_rate=100)
-		self.warehouse = "_Test Warehouse - _TC"
+		self.warehouse = create_warehouse("_Test Warehouse")
 
 		make_stock_entry(
 			item=self.item.name,
