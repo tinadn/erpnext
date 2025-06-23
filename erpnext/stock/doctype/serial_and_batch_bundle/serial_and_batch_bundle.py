@@ -1508,13 +1508,10 @@ def get_reference_serial_and_batch_bundle(child_row):
 
 
 def get_excluded_serial_numbers(child_row):
-    """
-    Fetch serial numbers already returned for the given child_row in any previous return if existing.
-    """
-    if not child_row or not child_row.get("doctype"):
-        return []
 	
-    field = {
+	if not child_row or not child_row.get("doctype"):
+		return []
+	field = {
         "Sales Invoice Item": "sales_invoice_item",
         "Delivery Note Item": "dn_detail",
         "Purchase Receipt Item": "purchase_receipt_item",
@@ -1522,23 +1519,22 @@ def get_excluded_serial_numbers(child_row):
         "POS Invoice Item": "pos_invoice_item",
     }.get(child_row.get("doctype"))
 	
-    if not field or not child_row.get(field):
-        return []
-    reference_name = child_row.get(field)
+	if not field or not child_row.get(field):
+		return []
+	reference_name = child_row.get(field)
 	
-    SerialAndBatchBundle = DocType("Serial and Batch Bundle")
-    SerialAndBatchEntry = DocType("Serial and Batch Entry")
-    query = (
-        frappe.qb.from_(SerialAndBatchBundle)
-        .join(SerialAndBatchEntry)
-        .on(SerialAndBatchBundle.name == SerialAndBatchEntry.parent)
-        .select((SerialAndBatchEntry.serial_no))
-        .where(SerialAndBatchBundle.returned_against == reference_name)
-    )
-
-    # Execute and return results as a list
-    excluded_serial_nos = list(set(query.run(pluck=True)))
-    return excluded_serial_nos
+	SerialAndBatchBundle = DocType("Serial and Batch Bundle")
+	SerialAndBatchEntry = DocType("Serial and Batch Entry")
+	query = (
+		frappe.qb.from_(SerialAndBatchBundle)
+		.join(SerialAndBatchEntry)
+		.on(SerialAndBatchBundle.name == SerialAndBatchEntry.parent)
+		.select((SerialAndBatchEntry.serial_no))
+		.where(SerialAndBatchBundle.returned_against == reference_name)
+	)
+	# Execute and return results as a list
+	excluded_serial_nos = list(set(query.run(pluck=True)))
+	return excluded_serial_nos
 
 
 @frappe.whitelist()
@@ -2295,7 +2291,7 @@ def get_voucher_wise_serial_batch_from_bundle(**kwargs) -> dict[str, dict]:
 
 def get_picked_batches(kwargs) -> dict[str, dict]:
 	picked_batches = frappe._dict()
-
+	
 	table = frappe.qb.DocType("Serial and Batch Bundle")
 	child_table = frappe.qb.DocType("Serial and Batch Entry")
 	pick_list_table = frappe.qb.DocType("Pick List")
@@ -2319,6 +2315,7 @@ def get_picked_batches(kwargs) -> dict[str, dict]:
 			& (table.voucher_type == "Pick List")
 			& (table.voucher_no.isnotnull())
 		)
+		.groupby(child_table.batch_no, child_table.warehouse)
 	)
 
 	if kwargs.get("item_code"):
@@ -2345,7 +2342,6 @@ def get_picked_batches(kwargs) -> dict[str, dict]:
 			)
 		else:
 			picked_batches[key].qty += row.qty
-
 	return picked_batches
 
 

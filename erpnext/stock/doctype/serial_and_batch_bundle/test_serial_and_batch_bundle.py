@@ -534,13 +534,33 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		self.assertIsInstance(result, list)
 		for serial in result:
 			self.assertTrue(serial.startswith("TEST-SERIAL-"))
-		
+
+		pick_list_1 = frappe.get_doc(
+			{
+				"doctype": "Pick List",
+				"company": company,
+				"purpose": "Delivery",
+				"picker": "P001",
+				"locations": [
+					{
+						"item_code": item.name,
+						"qty": 1,
+						"stock_qty": 1,
+						"conversion_factor": 1,
+					},
+				],
+			}
+		)
+		pick_list_1.set_item_locations()
+		pick_list_1.submit()
+
 		args = {
 					"item_code": item.item_code,
 					"warehouse": warehouse,
 					"has_batch_no": item.has_batch_no,
 					"qty": 5,
 					"based_on": "FIFO",
+					"is_pick_list":pick_list_1.name,
 					"posting_date": frappe.utils.now(),
  					"posting_time": frappe.utils.now()
 				}
@@ -1069,6 +1089,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		expected = [{'serial_no': 'MDC01012', 'qty': 1}]
 		self.assertEqual(created_serial, expected)
 	
+	# codecov
 	def test_reset_serial_batch_bundle_TC_SCK_473(self):
 		company = "_Test Indian Registered Company"
 		warehouse = "Stores - _TIRC"
@@ -1169,8 +1190,6 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		assert dn.docstatus == 1
 		assert dn.items[0].serial_no == serial_no.name
 		
-		
-
 		serial_batch_bundle_stock_entry = frappe.get_doc({
 			"doctype": "Serial and Batch Bundle",
 			"naming_series": "SABB-.########",
@@ -1182,6 +1201,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			"has_batch_no": 1,
 			"voucher_detail_no": dn.items[0].name,
 			"entries": [{
+				"doctype":"Serial and Batch Entry",
 				"serial_no": serial_no.name,
 				"batch_no": batch.name,
 				"qty": 0,
@@ -1202,12 +1222,12 @@ class TestSerialandBatchBundle(FrappeTestCase):
 		stock_entry.cancel()
 		serial_batch_bundle_stock_entry.delete_serial_batch_entries()
 		entries = {
+			"doctype":"Serial and Batch Entry",
 			"serial_no": serial_no.name,
 			"batch_no": batch.name,
 			"qty": -1,
 			"warehouse": warehouse
 		}
-
 		get_filters_for_bundle(
 			item_code=item.name,
 			docstatus=None,
@@ -1216,6 +1236,7 @@ class TestSerialandBatchBundle(FrappeTestCase):
 			child_row=json.dumps(entries)  # Convert dict to JSON string
 		)
 
+	# codecov
 	def test_get_serial_batch_ledgers_TC_SCK_474(self):
 		company = "_Test Indian Registered Company"
 		warehouse = "Stores - _TIRC"
