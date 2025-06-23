@@ -75,7 +75,28 @@ class TestStockLedgerInvariantCheck(unittest.TestCase):
 				"valuation_rate": se_doc.items[0].basic_rate,
 			}
 		]
+		frappe.db.delete(
+			"Repost Item Valuation",
+			{
+				"item_code": self.item.name,
+				"warehouse": self.warehouse,
+				"posting_date": se_doc.posting_date,
+				"posting_time": se_doc.posting_time,
+			},
+		)
 		report.create_reposting_entries(rows)
+		repost = frappe.get_all(
+			"Repost Item Valuation",
+			filters={
+				"item_code": self.item.name,
+				"warehouse": self.warehouse,
+				"posting_date": se_doc.posting_date,
+				"posting_time": se_doc.posting_time,
+				"docstatus": 1,
+			},
+			fields=["name"],
+		)
+		self.assertTrue(repost, "Repost Item Valuation entry was not created.")
 
 	def test_create_reposting_entries_with_string_input_T_SLIC_004(self):
 		import json
@@ -99,7 +120,28 @@ class TestStockLedgerInvariantCheck(unittest.TestCase):
 				"valuation_rate": float(se_doc.items[0].basic_rate),
 			}
 		]
+		frappe.db.delete(
+			"Repost Item Valuation",
+			{
+				"item_code": self.item.name,
+				"warehouse": self.warehouse,
+				"posting_date": se_doc.posting_date,
+				"posting_time": se_doc.posting_time,
+			},
+		)
 		report.create_reposting_entries(json.dumps(rows))
+		reposts = frappe.get_all(
+			"Repost Item Valuation",
+			filters={
+				"item_code": self.item.name,
+				"warehouse": self.warehouse,
+				"posting_date": se_doc.posting_date,
+				"posting_time": se_doc.posting_time,
+				"docstatus": 1,
+			},
+			fields=["name"],
+		)
+		self.assertTrue(reposts, "Repost Item Valuation not created from JSON string input.")
 
 	def test_report_columns_T_SLIC_005(self):
 		columns = report.get_columns()
