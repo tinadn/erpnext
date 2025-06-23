@@ -5058,13 +5058,10 @@ class TestStockEntry(FrappeTestCase):
 		source_warehouse = create_warehouse("_Test Source WH", company="_Test Company")
 
 		# Step 3: Create item
-		if not frappe.db.exists("Item", "Test Item"):
-			make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1, "has_batch_no": 1})
-
-		# Ensure has_batch_no is set even if item existed
-		item = frappe.get_doc("Item", "Test Item")
-		item.has_batch_no = 1
-		item.save()
+		item = make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1})
+		if not item.has_batch_no:
+			item.has_batch_no = 1
+			item.save()
 
 		# Also insert the corresponding batch
 		if not frappe.db.exists("Batch", "TEST-BATCH-001"):
