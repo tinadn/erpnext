@@ -144,3 +144,4 @@ class TestDelayedOrderReport(FrappeTestCase):
         keys = data[0].keys()
         for field in ["sales_order", "customer", "delivery_date", "grand_total", "po_no"]:
             self.assertIn(field, keys)
+
