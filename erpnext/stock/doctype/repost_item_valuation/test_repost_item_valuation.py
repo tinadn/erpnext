@@ -36,12 +36,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer("_Test Customer", currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -98,12 +96,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 	def test_repost_entries_TC_SCK_352(self):
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer("_Test Customer", currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -166,12 +162,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer("_Test Customer", currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -247,12 +241,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer(customer, currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -310,12 +302,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer("_Test Customer", currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -374,12 +364,10 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 
 		company = "_Test Company"
 		warehouse = "Stores - _TC"
-		if not frappe.db.exists("Company", company):
-			create_child_company().company
+		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", "_Test Customer"):
-			create_customer("_Test Customer", currency="INR")
+		create_customer(customer, currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
@@ -440,8 +428,7 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		make_company(company)
 
 		customer = "_Test Customer"
-		if not frappe.db.exists("Customer", customer):
-			create_customer("_Test Customer", currency="INR")
+		create_customer(customer, currency="INR")
 
 		item = make_item("Repost item")
 		warehouse = "_Test Warehouse - _TC"
