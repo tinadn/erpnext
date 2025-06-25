@@ -14,9 +14,9 @@ from erpnext.stock.utils import get_stock_value_on
 
 
 def execute(filters=None):
-	if not erpnext.is_perpetual_inventory_enabled(filters.company):
+	if not erpnext.is_perpetual_inventory_enabled(filters.get("company")):
 		frappe.throw(
-			_("Perpetual inventory required for the company {0} to view this report.").format(filters.company)
+			_("Perpetual inventory required for the company {0} to view this report.").format(filters.get("company"))
 		)
 
 	data = get_data(filters)
