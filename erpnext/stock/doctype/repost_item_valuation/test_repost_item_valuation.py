@@ -35,7 +35,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		)
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -95,7 +94,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 	# codecov
 	def test_repost_entries_TC_SCK_352(self):
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -161,7 +159,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -240,7 +237,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -301,7 +297,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -363,7 +358,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
@@ -424,7 +418,6 @@ class TestRepostItemValuation(FrappeTestCase, StockTestMixin):
 		from erpnext.stock.doctype.repost_item_valuation.repost_item_valuation import repost
 
 		company = "_Test Company"
-		warehouse = "Stores - _TC"
 		make_company(company)
 
 		customer = "_Test Customer"
