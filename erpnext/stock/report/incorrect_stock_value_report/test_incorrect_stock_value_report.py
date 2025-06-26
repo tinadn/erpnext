@@ -103,8 +103,8 @@ class TestIncorrectStockValueReport(FrappeTestCase):
     def test_execute_returns_columns_and_data(self):
         filters = {
             "company": "_Test Indian Registered Company",
-            # "account": self.account,
-            # "from_date": nowdate()
+            "account": self.account,
+            "from_date": nowdate()
         }
         columns, data = execute(filters)
         self.assertTrue(columns, "Report should return columns")
@@ -114,8 +114,8 @@ class TestIncorrectStockValueReport(FrappeTestCase):
     def test_get_data_detects_unsync(self):
         filters = {
             "company": "_Test Indian Registered Company",
-            # "account": self.account,
-            # "from_date": nowdate()
+            "account": self.account,
+            "from_date": nowdate()
         }
         columns, data = execute(filters)
         self.assertTrue(data, "Expected at least one mismatch row in the report result")
@@ -128,8 +128,8 @@ class TestIncorrectStockValueReport(FrappeTestCase):
     def test_get_data_filters_and_calculates_correctly(self):
         filters = {
             "company": "_Test Indian Registered Company",
-            # "account": self.account,
-            # "from_date": nowdate()
+            "account": self.account,
+            "from_date": nowdate()
         }
 
         # Directly invoke get_data to test filtering and calculation logic
@@ -195,7 +195,7 @@ class TestIncorrectStockValueReport(FrappeTestCase):
     def test_get_data_respects_account_filter(self):
         data = get_data({
             "company": self.company,
-            # "account": self.account
+            "account": self.account
         })
         self.assertIsInstance(data, list)
         # Since there is mismatch in the default SLE created in setup, this should not be empty
