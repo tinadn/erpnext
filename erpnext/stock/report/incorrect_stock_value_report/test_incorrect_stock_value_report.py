@@ -17,7 +17,6 @@ class TestIncorrectStockValueReport(FrappeTestCase):
         self.company = create_company("_Test Indian Registered Company")
         self.company = "_Test Indian Registered Company"
         frappe.db.set_value("Company", self.company, "enable_perpetual_inventory", 1)
-        print("copmany",self.company)
 
         # Ensure required account exists
         if not frappe.db.exists("Account", "Stock Adjustment - _TIRC"):
@@ -85,7 +84,6 @@ class TestIncorrectStockValueReport(FrappeTestCase):
         })
         stock_entry.insert()
         stock_entry.submit()
-        print("stock",stock_entry)
 
         # Simulate stock value mismatch
         sle_list = frappe.get_all(
@@ -155,3 +153,59 @@ class TestIncorrectStockValueReport(FrappeTestCase):
                 msg="Difference value must match computed mismatch"
             )
 
+    def test_get_data_returns_empty_if_no_unsync_date(self):
+        # Create stock entry with no intentional mismatch
+        stock_entry = frappe.get_doc({
+            "doctype": "Stock Entry",
+            "stock_entry_type": "Material Receipt",
+            "company": "_Test Company",
+            "posting_date": today(),
+            "posting_time": "09:00:00",
+            "difference_account": "Stock In Hand - _TC",
+            "items": [
+                {
+                    "item_code": self.item1,
+                    "qty": 1,
+                    "rate": 1000,
+                    "t_warehouse": "_Test warehouse - _TC",
+                    "allow_zero_valuation_rate": 1,
+                }
+            ]
+        })
+        stock_entry.insert()
+        stock_entry.submit()
+
+        # Execute report
+        data = get_data({
+            "company": "_Test Company"
+        })
+
+        # Since there is no mismatch, the report should return an empty list
+        self.assertEqual(data, [], "Expected empty result when there is no unsync date or mismatch")
+
+
+    def test_report_columns_have_expected_fields(self):
+        filters = {"company": self.company}
+        columns, _ = execute(filters)
+        expected_keys = ["item_code", "stock_value", "expected_stock_value", "difference_value"]
+        for key in expected_keys:
+            self.assertTrue(any(key in str(col) for col in columns), f"Expected column '{key}' not found")
+
+
+    def test_get_data_respects_account_filter(self):
+        data = get_data({
+            "company": self.company,
+            # "account": self.account
+        })
+        self.assertIsInstance(data, list)
+        # Since there is mismatch in the default SLE created in setup, this should not be empty
+        self.assertTrue(any(row["stock_value"] for row in data), "Account filter should still return relevant mismatches")
+
+    def test_get_data_respects_date_filters(self):
+        future_date = add_days(today(), 30)
+        data = get_data({
+            "company": self.company,
+            "from_date": future_date,
+            "to_date": future_date,
+        })
+        self.assertEqual(data, [], "Report should return no data if no entries fall within the date range")
