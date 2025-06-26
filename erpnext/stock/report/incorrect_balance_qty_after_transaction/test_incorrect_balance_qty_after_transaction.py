@@ -170,3 +170,69 @@ class TestIncorrectBalanceQtyReport(FrappeTestCase):
                 break
 
         self.assertTrue(found_row and found_empty_dict, "Expected validate_data to append a row and an empty dict")
+
+    def test_validate_data_appends_row_and_empty_dict_for_qty_mismatch(self):
+        from erpnext.stock.report.incorrect_balance_qty_after_transaction import incorrect_balance_qty_after_transaction as report
+
+        # Create initial stock entry
+        stock_entry = frappe.get_doc({
+            "doctype": "Stock Entry",
+            "stock_entry_type": "Material Receipt",
+            "company": self.company,
+            "to_warehouse": self.warehouse,
+            "items": [{
+                "item_code": self.item_code,
+                "qty": 10,
+                "rate": 100,
+                "t_warehouse": self.warehouse
+            }]
+        })
+        stock_entry.insert()
+        stock_entry.submit()
+
+        # Create stock reconciliation with reset logic
+        stock_recon = frappe.get_doc({
+            "doctype": "Stock Reconciliation",
+            "company": self.company,
+            "purpose": "Stock Reconciliation",
+            "items": [{
+                "item_code": self.item_code,
+                "warehouse": self.warehouse,
+                "qty": 20,
+                "valuation_rate": 100
+            }],
+            "posting_date": nowdate(),
+            "posting_time": "11:59:59"
+        })
+        stock_recon.insert()
+        stock_recon.submit()
+
+        # Tamper the Stock Ledger Entry to simulate mismatch
+        sle_name = frappe.db.get_value(
+            "Stock Ledger Entry",
+            {"voucher_type": "Stock Reconciliation", "voucher_no": stock_recon.name},
+            "name"
+        )
+
+        # Set the qty_after_transaction to simulate error and empty batch_no
+        frappe.db.set_value("Stock Ledger Entry", sle_name, {
+            "qty_after_transaction": 17,  # Should be 20, introduce diff of 3
+            "batch_no": "",
+        })
+        frappe.db.commit()
+
+        # Run report
+        columns, data = report.execute({
+            "company": self.company,
+            "warehouse": self.warehouse,
+            "item_code": self.item_code.name
+        })
+
+        # Find whether a row followed by an empty dict exists
+        found_error_row_and_blank = False
+        for i in range(len(data) - 1):
+            if isinstance(data[i], dict) and data[i].get("differnce") and data[i + 1] == {}:
+                found_error_row_and_blank = True
+                break
+
+        self
