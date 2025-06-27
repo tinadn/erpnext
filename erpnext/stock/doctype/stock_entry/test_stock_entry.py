@@ -5063,7 +5063,7 @@ class TestStockEntry(FrappeTestCase):
 			item.has_batch_no = 1
 
 		# if gst_hsn_code is not set in item
-		if not item.gst_hsn_code:
+		if frappe.db.has_column("Item", "gst_hsn_code") and not item.gst_hsn_code:
 			item.gst_hsn_code = "100111"
 
 		item.save()
