@@ -1569,7 +1569,7 @@ class TestPickList(FrappeTestCase):
 			"_Test Raw Item WO", {"is_stock_item": 1, "stock_uom": "Nos", "valuation_rate": 50}
 		).name
 		# Create required warehouses
-		wip_w = create_warehouse("_Test WIP Warehouse", {"company": "_Test Company"})
+		wip_w = create_warehouse("_Test WIP Warehouse", {"is_group": "0"}, "_Test Company")
 		fg_w = create_warehouse("_Test FG Warehouse", {"company": "_Test Company"})
 		t_w = create_warehouse("_Test Warehouse", {"company": "_Test Company"})  # used in Pick List locations
 
@@ -1590,9 +1590,6 @@ class TestPickList(FrappeTestCase):
 		)
 		work_order.insert()
 		work_order.submit()
-
-		# Set WIP warehouse is_group = 0
-		frappe.db.set_value("Warehouse", work_order.wip_warehouse, "is_group", 0)
 
 		# Create dummy Pick List
 		pick_list = frappe.new_doc("Pick List")
