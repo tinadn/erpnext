@@ -5061,7 +5061,12 @@ class TestStockEntry(FrappeTestCase):
 		item = make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1})
 		if not item.has_batch_no:
 			item.has_batch_no = 1
-			item.save()
+
+		# if gst_hsn_code is not set in item
+		if frappe.db.has_column("Item", "gst_hsn_code") and not item.gst_hsn_code:
+			item.gst_hsn_code = "100111"
+
+		item.save()
 
 		# Also insert the corresponding batch
 		if not frappe.db.exists("Batch", "TEST-BATCH-001"):
@@ -5763,6 +5768,7 @@ class TestStockEntry(FrappeTestCase):
 				"schedule_date": frappe.utils.nowdate(),
 				"is_subcontracted": 1,
 				"subcontracting_type": "Raw Material Supplied",
+				"supplier_warehouse": subcontract_wh,
 				"items": [
 					{
 						"fg_item": "Sub Raw Bom Mat",
