@@ -6286,8 +6286,6 @@ class TestPurchaseReceipt(FrappeTestCase):
 		company = setup_test_company_defaults()
 		supplier = create_supplier()
 		create_uom("_Test UOM")
-		supplier_warehouse = create_warehouse("_Test Warehouse 1", {"company": company.name})
-		warehouse = create_warehouse("_Test Warehouse DocStatus", {"company": company.name})
 
 		parent_account = ensure_parent_account("Parent Stock Account", company.name, company.abbr)
 		w_account = create_account(
@@ -6298,7 +6296,8 @@ class TestPurchaseReceipt(FrappeTestCase):
 			account_currency="INR",
 		)
 
-		frappe.db.set_value("Warehouse", warehouse, "account", w_account)
+		supplier_warehouse = create_warehouse("_Test Warehouse 1", {"company": company.name})
+		warehouse = create_warehouse("_Test Warehouse DocStatus", {"account": w_account}, company.name)
 
 		# Create PO
 		po = create_purchase_order(
