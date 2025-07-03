@@ -789,6 +789,10 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 			return;
 		}
 
+		if (item.serial_no) {
+			item.use_serial_batch_fields = 1
+		}
+
 		if (item && item.serial_no) {
 			if (!item.item_code) {
 				this.frm.trigger("item_code", cdt, cdn);
@@ -1038,7 +1042,7 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 		}
 	}
 
-	due_date(doc) {
+	due_date(doc, cdt) {
 		// due_date is to be changed, payment terms template and/or payment schedule must
 		// be removed as due_date is automatically changed based on payment terms
 
@@ -1586,7 +1590,12 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 
 	batch_no(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
-		if (row.use_serial_batch_fields && row.batch_no) {
+
+		if (row.batch_no) {
+			row.use_serial_batch_fields = 1
+		}
+
+		if (row.batch_no) {
 			var params = this._get_args(row);
 			params.batch_no = row.batch_no;
 			params.uom = row.uom;
@@ -1928,7 +1937,7 @@ erpnext.TransactionController = class TransactionController extends erpnext.taxe
 					row_to_modify["cost_center"] = r.message.cost_center;
 				}
 			}
-			
+
 			this.frm.script_manager.copy_from_first_row("items", row_to_modify, ["expense_account", "income_account"]);
 		});
 

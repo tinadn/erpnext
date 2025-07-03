@@ -27,7 +27,7 @@ class PurchaseReceipt(BuyingController):
 
 	from typing import TYPE_CHECKING
 
-	if TYPE_CHECKING:
+	if TYPE_CHECKING:  # pragma: no cover
 		from erpnext.accounts.doctype.pricing_rule_detail.pricing_rule_detail import PricingRuleDetail
 		from erpnext.accounts.doctype.purchase_taxes_and_charges.purchase_taxes_and_charges import PurchaseTaxesandCharges
 		from erpnext.buying.doctype.purchase_receipt_item_supplied.purchase_receipt_item_supplied import PurchaseReceiptItemSupplied
@@ -64,6 +64,8 @@ class PurchaseReceipt(BuyingController):
 		currency: DF.Link
 		disable_rounded_total: DF.Check
 		discount_amount: DF.Currency
+		dispatch_address: DF.Link | None
+		dispatch_address_display: DF.TextEditor | None
 		grand_total: DF.Currency
 		group_same_items: DF.Check
 		ignore_pricing_rule: DF.Check

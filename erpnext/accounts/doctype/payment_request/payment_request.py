@@ -41,7 +41,7 @@ class PaymentRequest(Document):
 
 	from typing import TYPE_CHECKING
 
-	if TYPE_CHECKING:
+	if TYPE_CHECKING: # pragma: no cover
 		from erpnext.accounts.doctype.subscription_plan_detail.subscription_plan_detail import SubscriptionPlanDetail
 		from frappe.types import DF
 
@@ -649,7 +649,11 @@ def get_amount(ref_doc, payment_account=None):
 
 	dt = ref_doc.doctype
 	if dt in ["Sales Order", "Purchase Order"]:
-		grand_total = (flt(ref_doc.rounded_total) or flt(ref_doc.grand_total)) - ref_doc.advance_paid
+		advance_amount = flt(ref_doc.advance_paid)
+		if ref_doc.party_account_currency != ref_doc.currency:
+			advance_amount = flt(flt(ref_doc.advance_paid) / ref_doc.conversion_rate)
+
+		grand_total = (flt(ref_doc.rounded_total) or flt(ref_doc.grand_total)) - advance_amount
 	elif dt in ["Sales Invoice", "Purchase Invoice"]:
 		if (
 			dt == "Sales Invoice"
