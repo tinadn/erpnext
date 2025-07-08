@@ -5459,6 +5459,70 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 		self.assertIn("this WBS is locked", str(cm.exception))
 
+	@change_settings("Buying Settings", {"po_required": "Yes"})
+	def test_po_required_in_pi_codecov(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.insert(ignore_permissions=True)
+		self.assertIn(
+			"Purchase Order Required for item _Test ItemTo submit the invoice without purchase order please set Purchase Order Required as No in Buying Settings",
+			str(cm.exception),
+		)
+
+	@change_settings("Buying Settings", {"pr_required": "Yes"})
+	def test_pr_required_in_pi_codecov(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.insert(ignore_permissions=True)
+		self.assertIn(
+			"Purchase Receipt Required for item _Test ItemTo submit the invoice without purchase receipt please set Purchase Receipt Required as No in Buying Settings",
+			str(cm.exception),
+		)
+
+	def test_validate_write_off_account_codecov(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.write_off_amount = 100
+		pi.write_off_account = ""
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.save()
+		self.assertIn("Please enter Write Off Account", str(cm.exception))
+
+	def test_validate_supplier_invoice_date_codecov(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.posting_date = today()
+		pi.bill_date = add_days(today(), 1)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.save()
+		self.assertIn("Supplier Invoice Date cannot be greater than Posting Date", str(cm.exception))
+
+	def test_block_and_unblock_purchase_invoice_codecov(self):
+		from .purchase_invoice import block_invoice, change_release_date, unblock_invoice
+
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.insert(ignore_permissions=True)
+		pi.submit()
+
+		block_invoice(pi.name, release_date=today(), hold_comment="Test Comment")
+		pi.load_from_db()
+
+		self.assertEqual(pi.on_hold, 1)
+		self.assertEqual(pi.docstatus, 1)
+
+		unblock_invoice(pi.name)
+		pi.load_from_db()
+
+		self.assertEqual(pi.on_hold, 0)
+		self.assertEqual(pi.docstatus, 1)
+
+		change_release_date(name=pi.name, release_date=add_days(today(), 1))
+		pi.load_from_db()
+		self.assertEqual(getdate(pi.release_date), getdate(add_days(today(), 1)))
+
 
 def set_advance_flag(company, flag, default_account):
 	frappe.db.set_value(
