@@ -153,6 +153,27 @@ class TestPOSOpeningEntry(FrappeTestCase):
 			poe.insert()
 		self.assertIn(f"User {user.name} is disabled. Please select valid user/cashier", str(cm.exception))
 
+		user.enabled = 1
+		user.save()
+
+		poe_1 = frappe.get_doc(
+			{
+				"doctype": "POS Opening Entry",
+				"company": "_Test Company",
+				"period_start_date": frappe.utils.now_datetime,
+				"posting_date": frappe.utils.today(),
+				"pos_profile": pos_profile.name,
+				"user": user.name,
+				"balance_details": [{"mode_of_payment": get_mode_of_payment(), "opening_amount": 100}],
+			}
+		)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			poe_1.insert()
+		self.assertIn(
+			"Please set default Cash or Bank account in Mode of Payments __Test Mode Payment",
+			str(cm.exception),
+		)
+
 
 def create_opening_entry(pos_profile, user):
 	entry = frappe.new_doc("POS Opening Entry")
@@ -169,3 +190,9 @@ def create_opening_entry(pos_profile, user):
 	entry.submit()
 
 	return entry
+
+
+def get_mode_of_payment():
+	payment_mode = frappe.get_doc({"doctype": "Mode of Payment", "mode_of_payment": "__Test Mode Payment"})
+	payment_mode.insert(ignore_permissions=True)
+	return payment_mode.name
