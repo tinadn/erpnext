@@ -5463,7 +5463,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		self.assertIn("this WBS is locked", str(cm.exception))
 
 	@change_settings("Buying Settings", {"po_required": "Yes"})
-	def test_po_required_in_pi_TC_ACC_308(self):
+	def test_po_required_in_pi_TC_ACC_319(self):
 		args = {"qty": 1, "rate": 200, "do_not_save": True}
 		pi = make_purchase_invoice(**args)
 		with self.assertRaises(frappe.ValidationError) as cm:
