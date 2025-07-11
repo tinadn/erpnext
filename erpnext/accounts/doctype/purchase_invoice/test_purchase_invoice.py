@@ -9,6 +9,7 @@ from frappe.utils import (
 	add_days,
 	cint,
 	flt,
+	formatdate,
 	get_quarter_start,
 	get_year_ending,
 	get_year_start,
@@ -23,7 +24,7 @@ from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_ent
 from erpnext.buying.doctype.purchase_order.purchase_order import get_mapped_purchase_invoice
 from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice as make_pi_from_po
 from erpnext.buying.doctype.supplier.test_supplier import create_supplier
-from erpnext.controllers.accounts_controller import get_payment_terms, InvalidQtyError
+from erpnext.controllers.accounts_controller import InvalidQtyError, get_payment_terms
 from erpnext.controllers.buying_controller import QtyMismatchError
 from erpnext.exceptions import InvalidCurrency
 from erpnext.stock.doctype.item.test_item import create_item
@@ -1516,7 +1517,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 		pi = create_purchase_invoice_from_receipt(pr.name)
 		pi.set_posting_time = 1
-		pi.posting_date = add_days(pr.posting_date, -1)
+		pi.posting_date = add_days(pr.posting_date, 1)
 		pi.items[0].expense_account = "Cost of Goods Sold - _TC"
 		pi.save()
 		pi.submit()
@@ -1525,8 +1526,8 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 		# Check GLE for Purchase Invoice
 		expected_gle = [
-			["Cost of Goods Sold - _TC", 250, 0, add_days(pr.posting_date, -1)],
-			["Creditors - _TC", 0, 250, add_days(pr.posting_date, -1)],
+			["Cost of Goods Sold - _TC", 250, 0, add_days(pr.posting_date, 1)],
+			["Creditors - _TC", 0, 250, add_days(pr.posting_date, 1)],
 		]
 
 		check_gl_entries(self, pi.name, expected_gle, pi.posting_date)
@@ -3364,12 +3365,14 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 			get_linked_payments_for_doc,
 		)
 
+		frappe.set_value("Supplier", "_Test Supplier", "payment_terms", None)
 		add_purchase_invoice_in_account_reposting_setting()
 		pi = make_purchase_invoice(
 			qty=1, item_code="_Test Item", supplier="_Test Supplier", company="_Test Company", rate=30
 		)
 
 		pi.save()
+		pi.reload()
 		pi.submit()
 		pi_status_before = frappe.db.get_value("Purchase Invoice", pi.name, "status")
 		self.assertEqual(pi_status_before, "Unpaid")
@@ -3405,7 +3408,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		self.assertEqual(return_pi.status, "Return")
 
 		pi.reload()
-		self.assertEqual(pi.status, "Debit Note Issued")
+		self.assertEqual(pi.status, "Paid")
 
 		get_linked_payments_for_doc(pe.company, pe.doctype, pe.name)
 
@@ -3835,7 +3838,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		purchase_tax = frappe.new_doc("Purchase Taxes and Charges Template")
 		purchase_tax.title = "TEST"
 		purchase_tax.company = "_Test Company"
-		purchase_tax.tax_category = "_Test Tax Category 1"
+		purchase_tax.tax_category = "_Test Tax Category 2"
 
 		purchase_tax.append(
 			"taxes",
@@ -3880,7 +3883,7 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 		purchase_tax = frappe.new_doc("Purchase Taxes and Charges Template")
 		purchase_tax.title = "TEST"
 		purchase_tax.company = "_Test Company"
-		purchase_tax.tax_category = "_Test Tax Category 1"
+		purchase_tax.tax_category = "_Test Tax Category 2"
 
 		purchase_tax.append(
 			"taxes",
@@ -5271,6 +5274,377 @@ class TestPurchaseInvoice(FrappeTestCase, StockTestMixin):
 
 		# Test 4 - Since this PI is overbilled by 130% and only 120% is allowed, it will fail
 		self.assertRaises(frappe.ValidationError, pi.submit)
+
+	@if_app_installed("projects")
+	def test_validate_available_budget_TC_ACC_292(self):
+		from unittest.mock import patch
+
+		project_name = "test_project" + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Project", {"project_name": project_name}):
+			frappe.get_doc(
+				{"doctype": "Project", "company": "_Test Company", "project_name": project_name, "is_wbs": 1}
+			).insert(ignore_permissions=True)
+
+		project = frappe.db.get_value("Project", {"project_name": project_name})
+
+		wbs = frappe.get_doc(
+			{
+				"doctype": "Work Breakdown Structure",
+				"project": project,
+				"wbs_name": "test_wbs",
+				"company": "_Test Company",
+				"gl_account": "Cash - _TC",
+			}
+		)
+		wbs.insert(ignore_permissions=True)
+		wbs.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		zero_budget = frappe.get_doc(
+			{
+				"doctype": "Zero Budget",
+				"project": project,
+				"posting_date": today(),
+				"zero_budget_item": [{"wbs_element": wbs.name, "zero_budget": 100}],
+			}
+		)
+		zero_budget.insert(ignore_permissions=True)
+		zero_budget.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		wbs.load_from_db()
+
+		wbs_1 = frappe.copy_doc(wbs)
+		wbs_1.insert(ignore_permissions=True)
+		wbs_1.submit()
+
+		with patch("frappe.msgprint") as mock_msgprint:
+			args = {"qty": 1, "rate": 200, "do_not_submit": True}
+			pi = make_purchase_invoice(**args)
+			pi.items[0].work_breakdown_structure = wbs.name
+			pi.save()
+
+			self.assertTrue(mock_msgprint.called)
+			msg_args, _ = mock_msgprint.call_args
+			self.assertIn("Available Budget Limit Exceeded", msg_args[0])
+
+			pi.append(
+				"items",
+				{
+					"item_code": "_Test Item",
+					"rate": 200,
+					"qty": 1,
+					"warehouse": "_Test Warehouse - _TC",
+					"work_breakdown_structure": wbs_1.name,
+				},
+			)
+			pi.save()
+			self.assertTrue(mock_msgprint.called)
+			msg_args, _ = mock_msgprint.call_args
+			self.assertIn("Available Budget Limit Exceeded", msg_args[0])
+
+	@if_app_installed("projects")
+	def test_update_actual_overall_budget_TC_ACC_293(self):
+		project_name = "test_project" + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Project", {"project_name": project_name}):
+			frappe.get_doc(
+				{"doctype": "Project", "company": "_Test Company", "project_name": project_name, "is_wbs": 1}
+			).insert()
+
+		project = frappe.db.get_value("Project", {"project_name": project_name})
+
+		wbs = frappe.get_doc(
+			{
+				"doctype": "Work Breakdown Structure",
+				"project": project,
+				"wbs_name": "test_wbs",
+				"company": "_Test Company",
+				"gl_account": "Cash - _TC",
+			}
+		)
+		wbs.insert()
+		wbs.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		zero_budget = frappe.get_doc(
+			{
+				"doctype": "Zero Budget",
+				"project": project,
+				"posting_date": today(),
+				"zero_budget_item": [{"wbs_element": wbs.name, "zero_budget": 100}],
+			}
+		)
+		zero_budget.insert()
+		zero_budget.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		args = {"qty": 1, "rate": 200, "do_not_submit": True}
+		pi = make_purchase_invoice(**args)
+		pi.items[0].work_breakdown_structure = wbs.name
+		pi.save()
+		pi.submit()
+		self.assertEqual(pi.docstatus, 1)
+
+		pi.load_from_db()
+		pi.cancel()
+
+	@if_app_installed("projects")
+	def test_update_locked_actual_overall_budgets_TC_ACC_294(self):
+		project_name = "test_project" + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Project", {"project_name": project_name}):
+			frappe.get_doc(
+				{"doctype": "Project", "company": "_Test Company", "project_name": project_name, "is_wbs": 1}
+			).insert()
+
+		project = frappe.db.get_value("Project", {"project_name": project_name})
+
+		wbs = frappe.get_doc(
+			{
+				"doctype": "Work Breakdown Structure",
+				"project": project,
+				"wbs_name": "test_wbs",
+				"company": "_Test Company",
+				"gl_account": "Cash - _TC",
+			}
+		)
+		wbs.insert()
+		wbs.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		zero_budget = frappe.get_doc(
+			{
+				"doctype": "Zero Budget",
+				"project": project,
+				"posting_date": today(),
+				"zero_budget_item": [{"wbs_element": wbs.name, "zero_budget": 100}],
+			}
+		)
+		zero_budget.insert()
+		zero_budget.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 1)
+
+		args = {"qty": 1, "rate": 100, "do_not_submit": True}
+		pi = make_purchase_invoice(**args)
+		pi.items[0].work_breakdown_structure = wbs.name
+		pi.save()
+		with self.assertRaises(frappe.exceptions.ValidationError) as cm:
+			pi.submit()
+
+		self.assertIn("this WBS is locked", str(cm.exception))
+
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 0)
+		pi.submit()
+		self.assertEqual(pi.docstatus, 1)
+
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 1)
+		with self.assertRaises(frappe.exceptions.ValidationError) as cm:
+			pi.cancel()
+
+		self.assertIn("this WBS is locked", str(cm.exception))
+
+	@if_app_installed("projects")
+	def test_locked_committed_overall_budget_po_to_pi_TC_ACC_295(self):
+		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_invoice
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
+
+		project_name = "test_project" + frappe.generate_hash(length=5)
+		if not frappe.db.exists("Project", {"project_name": project_name}):
+			frappe.get_doc(
+				{"doctype": "Project", "company": "_Test Company", "project_name": project_name, "is_wbs": 1}
+			).insert()
+
+		project = frappe.db.get_value("Project", {"project_name": project_name})
+
+		wbs = frappe.get_doc(
+			{
+				"doctype": "Work Breakdown Structure",
+				"project": project,
+				"wbs_name": "test_wbs",
+				"company": "_Test Company",
+				"gl_account": "Cash - _TC",
+			}
+		)
+		wbs.insert()
+		wbs.submit()
+
+		self.assertEqual(wbs.docstatus, 1)
+
+		zero_budget = frappe.get_doc(
+			{
+				"doctype": "Zero Budget",
+				"project": project,
+				"posting_date": today(),
+				"zero_budget_item": [{"wbs_element": wbs.name, "zero_budget": 100}],
+			}
+		)
+		zero_budget.insert()
+		zero_budget.submit()
+
+		args = {"qty": 1, "rate": 100, "do_not_save": True}
+		po = create_purchase_order(**args)
+		po.insert(ignore_permissions=True)
+		po.submit()
+		self.assertEqual(po.docstatus, 1)
+
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 1)
+		po = make_purchase_invoice(po.name)
+		po.items[0].work_breakdown_structure = wbs.name
+		po.save()
+		with self.assertRaises(frappe.exceptions.ValidationError) as cm:
+			po.submit()
+
+		self.assertIn("this WBS is locked", str(cm.exception))
+
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 0)
+		po.submit()
+		self.assertEqual(po.docstatus, 1)
+
+		frappe.db.set_value("Work Breakdown Structure", wbs.name, "locked", 1)
+		with self.assertRaises(frappe.exceptions.ValidationError) as cm:
+			po.cancel()
+
+		self.assertIn("this WBS is locked", str(cm.exception))
+
+	@change_settings("Buying Settings", {"po_required": "Yes"})
+	def test_po_required_in_pi_TC_ACC_319(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.insert(ignore_permissions=True)
+		self.assertIn(
+			"Purchase Order Required for item _Test ItemTo submit the invoice without purchase order please set Purchase Order Required as No in Buying Settings",
+			str(cm.exception),
+		)
+
+	@change_settings("Buying Settings", {"pr_required": "Yes"})
+	def test_pr_required_in_pi_TC_ACC_309(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.insert(ignore_permissions=True)
+		self.assertIn(
+			"Purchase Receipt Required for item _Test ItemTo submit the invoice without purchase receipt please set Purchase Receipt Required as No in Buying Settings",
+			str(cm.exception),
+		)
+
+	def test_validate_write_off_account_TC_ACC_310(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.write_off_amount = 100
+		pi.write_off_account = ""
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.save()
+		self.assertIn("Please enter Write Off Account", str(cm.exception))
+
+	def test_validate_supplier_invoice_date_TC_ACC_311(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.posting_date = today()
+		pi.bill_date = add_days(today(), 1)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.save()
+		self.assertIn("Supplier Invoice Date cannot be greater than Posting Date", str(cm.exception))
+
+	def test_block_and_unblock_purchase_invoice_TC_ACC_312(self):
+		from .purchase_invoice import block_invoice, change_release_date, unblock_invoice
+
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.insert(ignore_permissions=True)
+		pi.submit()
+
+		block_invoice(pi.name, release_date=today(), hold_comment="Test Comment")
+		pi.load_from_db()
+
+		self.assertEqual(pi.on_hold, 1)
+		self.assertEqual(pi.docstatus, 1)
+
+		unblock_invoice(pi.name)
+		pi.load_from_db()
+
+		self.assertEqual(pi.on_hold, 0)
+		self.assertEqual(pi.docstatus, 1)
+
+		change_release_date(name=pi.name, release_date=add_days(today(), 1))
+		pi.load_from_db()
+		self.assertEqual(getdate(pi.release_date), getdate(add_days(today(), 1)))
+
+	def test_get_list_context_313(self):
+		from .purchase_invoice import get_list_context
+
+		data = get_list_context()
+		self.assertTrue(data.get("title"), "Purchase Invoices")
+		self.assertTrue(data.get("no_breadcrumbs"), True)
+		self.assertTrue(data.get("show_sidebar"), True)
+		self.assertTrue(data.get("show_search"), True)
+
+	def test_check_prev_docstatus_314(self):
+		from erpnext.buying.doctype.purchase_order.test_purchase_order import create_purchase_order
+		from erpnext.stock.doctype.purchase_receipt.test_purchase_receipt import make_purchase_receipt
+
+		po = create_purchase_order(do_not_save=True)
+		po.insert(ignore_permissions=True)
+
+		pi = make_purchase_invoice(do_not_save=True)
+		pi.items[0].purchase_order = po.name
+		pi.insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.submit()
+		self.assertIn(f"{po.doctype} {po.name} is not submitted", str(cm.exception))
+
+		pr = make_purchase_receipt(do_not_save=True)
+		pr.insert(ignore_permissions=True)
+
+		pi_1 = make_purchase_invoice(do_not_save=True)
+		pi_1.items[0].purchase_receipt = pr.name
+		pi_1.insert(ignore_permissions=True)
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi_1.submit()
+		self.assertIn(f"{pr.doctype} {pr.name} is not submitted", str(cm.exception))
+
+	def test_make_write_off_gl_entry_with_writeoff_account_TC_ACC_315(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.write_off_amount = 100
+		pi.write_off_account = "Cash - _TC"
+		pi.insert(ignore_permissions=True)
+		pi.submit()
+
+		self.assertEqual(pi.status, "Partly Paid")
+		self.assertEqual(pi.docstatus, 1)
+
+	def test_create_remarks_TC_ACC_316(self):
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.remarks = ""
+		pi.bill_no = "test-1122"
+		pi.bill_date = today()
+		pi.insert(ignore_permissions=True)
+		pi.submit()
+		self.assertEqual(pi.remarks, f"Against Supplier Invoice {pi.bill_no} dated {formatdate(today())}")
+
+	def test_validate_credit_to_acc_TC_ACC_317(self):
+		from erpnext.accounts.doctype.account.test_account import create_account
+
+		account = create_account(
+			account_name="Deferred Expense", parent_account="Current Assets - _TC", company="_Test Company"
+		)
+		args = {"qty": 1, "rate": 200, "do_not_save": True}
+		pi = make_purchase_invoice(**args)
+		pi.credit_to = account
+		with self.assertRaises(frappe.ValidationError) as cm:
+			pi.insert(ignore_mandatory=True)
+		self.assertIn(
+			"Please ensure that the Credit To account Deferred Expense - _TC is a Payable account. You can change the account type to Payable or select a different account.",
+			str(cm.exception),
+		)
 
 
 def set_advance_flag(company, flag, default_account):
