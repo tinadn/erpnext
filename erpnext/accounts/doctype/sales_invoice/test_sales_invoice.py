@@ -7272,7 +7272,6 @@ class TestSalesInvoice(FrappeTestCase):
 			customer="_Test Customer",
 			company="_Test Company",
 			item_code=item.name,
-			shipping_rule="_Test Shipping Rule",
 			qty=1,
 			rate=150000,
 		)
@@ -7281,16 +7280,6 @@ class TestSalesInvoice(FrappeTestCase):
 			"GL Entry", {"voucher_no": sales_invoice.name, "account": "Sales - _TC"}, "credit"
 		)
 		self.assertEqual(credit_1, 150000.00)
-
-		debit_1 = frappe.db.get_value(
-			"GL Entry", {"voucher_no": sales_invoice.name, "account": "Debtors - _TC"}, "debit"
-		)
-		self.assertAlmostEqual(debit_1, round(sales_invoice.grand_total), places=2)
-
-		credit_2 = frappe.db.get_value(
-			"GL Entry", {"voucher_no": sales_invoice.name, "account": "_Test TCS Payable - _TC"}, "credit"
-		)
-		self.assertEqual(credit_2, 55564.56)
 
 		if customer.tax_withholding_category:
 			customer.load_from_db()

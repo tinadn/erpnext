@@ -5565,8 +5565,7 @@ class TestStockEntry(FrappeTestCase):
 	def test_delete_linked_stock_entry_removes_draft_receive_entry_TC_SCK_398(self):
 		frappe.set_user("Administrator")
 
-		item = make_test_item("__Test Item 1122")
-		item.is_stock_item = 1
+		item = make_test_item("__Test Stock Entry Item 112233")
 		item.valuation_rate = 100
 		item.save()
 		source_warehouse = create_warehouse("Source WH", company="_Test Company")
