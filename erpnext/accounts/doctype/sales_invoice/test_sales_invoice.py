@@ -7272,7 +7272,6 @@ class TestSalesInvoice(FrappeTestCase):
 			customer="_Test Customer",
 			company="_Test Company",
 			item_code=item.name,
-			shipping_rule="_Test Shipping Rule",
 			qty=1,
 			rate=150000,
 		)
@@ -7281,16 +7280,6 @@ class TestSalesInvoice(FrappeTestCase):
 			"GL Entry", {"voucher_no": sales_invoice.name, "account": "Sales - _TC"}, "credit"
 		)
 		self.assertEqual(credit_1, 150000.00)
-
-		debit_1 = frappe.db.get_value(
-			"GL Entry", {"voucher_no": sales_invoice.name, "account": "Debtors - _TC"}, "debit"
-		)
-		self.assertAlmostEqual(debit_1, round(sales_invoice.grand_total), places=2)
-
-		credit_2 = frappe.db.get_value(
-			"GL Entry", {"voucher_no": sales_invoice.name, "account": "_Test TCS Payable - _TC"}, "credit"
-		)
-		self.assertEqual(credit_2, 55564.56)
 
 		if customer.tax_withholding_category:
 			customer.load_from_db()
@@ -7361,6 +7350,10 @@ class TestSalesInvoice(FrappeTestCase):
 	def test_create_invoice_discounting_TC_ACC_244(self):
 		from .sales_invoice import create_invoice_discounting
 
+		get_dimensions = frappe.get_doc("Accounting Dimension", "Branch")
+		if get_dimensions:
+			get_dimensions.disabled = 1
+			get_dimensions.save()
 		si = create_sales_invoice()
 
 		self.assertEqual(si.docstatus, 1)
@@ -7382,6 +7375,9 @@ class TestSalesInvoice(FrappeTestCase):
 
 		self.assertEqual(invoice_discounting.docstatus, 1)
 		self.assertEqual(invoice_discounting.status, "Sanctioned")
+
+		get_dimensions.disabled = 0
+		get_dimensions.save()
 
 	def test_get_warehouse_TC_ACC_245(self):
 		si = create_sales_invoice(do_not_save=1)

@@ -3,6 +3,7 @@
 
 
 from datetime import date, datetime
+from unittest.mock import patch
 
 import frappe.utils
 from frappe.desk.query_report import run
@@ -11,6 +12,7 @@ from frappe.tests.utils import FrappeTestCase, change_settings
 from frappe.utils import add_days, cstr, flt, get_time, getdate, nowtime, today
 
 from erpnext.accounts.doctype.account.test_account import get_inventory_account
+from erpnext.accounts.doctype.payment_entry.test_payment_entry import make_test_item
 from erpnext.controllers.accounts_controller import InvalidQtyError
 from erpnext.stock.doctype.item.test_item import (
 	create_item,
@@ -5155,7 +5157,8 @@ class TestStockEntry(FrappeTestCase):
 		self.assertEqual(updated_item.amount, updated_item.basic_rate * updated_item.qty)
 		self.assertGreaterEqual(updated_item.actual_qty, 2)
 
-	def test_move_sample_to_retention_warehouse_TC_SCK_364(self):
+	@patch("assets.assets.customizations.stock.item.doc_events.validate_fixed_asset")
+	def test_move_sample_to_retention_warehouse_TC_SCK_364(self, mock_validate_fixed_asset):
 		frappe.set_user("Administrator")
 
 		# Step 1: Set retention warehouse in Stock Settings
@@ -5166,14 +5169,14 @@ class TestStockEntry(FrappeTestCase):
 		source_warehouse = create_warehouse("_Test Source WH", company="_Test Company")
 
 		# Step 3: Create item
-		item = make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1})
-		if not item.has_batch_no:
-			item.has_batch_no = 1
+		item = make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1, "has_batch_no": 1})
 
-		# if gst_hsn_code is not set in item
+		# Force update for gst_hsn_code if applicable
 		if frappe.db.has_column("Item", "gst_hsn_code") and not item.gst_hsn_code:
 			item.gst_hsn_code = "100111"
 
+		item.is_stock_item = 1
+		item.has_batch_no = 1
 		item.save()
 
 		# Also insert the corresponding batch
@@ -5562,11 +5565,7 @@ class TestStockEntry(FrappeTestCase):
 	def test_delete_linked_stock_entry_removes_draft_receive_entry_TC_SCK_398(self):
 		frappe.set_user("Administrator")
 
-		# Make sure test item exists
-		if not frappe.db.exists("Item", "Test Item"):
-			make_item("Test Item", {"stock_uom": "Nos", "is_stock_item": 1})
-
-		item = frappe.get_doc("Item", "Test Item")
+		item = make_test_item("__Test Stock Entry Item 112233")
 		item.valuation_rate = 100
 		item.save()
 		source_warehouse = create_warehouse("Source WH", company="_Test Company")
@@ -5581,7 +5580,7 @@ class TestStockEntry(FrappeTestCase):
 				"company": "_Test Company",
 				"items": [
 					{
-						"item_code": "Test Item",
+						"item_code": item.name,
 						"qty": 1,
 						"uom": "Nos",
 						"s_warehouse": source_warehouse,
@@ -5601,7 +5600,7 @@ class TestStockEntry(FrappeTestCase):
 				"company": "_Test Company",
 				"items": [
 					{
-						"item_code": "Test Item",
+						"item_code": item.name,
 						"qty": 1,
 						"uom": "Nos",
 						"t_warehouse": target_warehouse,
