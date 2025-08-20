@@ -80,7 +80,7 @@ class TestChequesAndDepositsIncorrectlyCleared(FrappeTestCase):
             self.assertEqual(result[key], value)
 
     def test_build_payment_entry_dict_payment(self):
-		print(" build payment ------------------------------------------------")
+        print("------------------------Testing payment entry dict for payment type -------------------------")
         payment_data = self.sample_payment_entry.copy()
         payment_data.payment_type = 'Pay'
         
