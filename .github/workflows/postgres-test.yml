@@ -74,7 +74,7 @@ jobs:
       - name: Install Apps
         working-directory: /home/runner/frappe-bench
         run: |
-          bench get-app erpnext https://tinadn:${{secrets.GH_PAT}}@github.com/tinadn/erpnext.git --branch pre-prod
+          bench get-app erpnext https://github.com/tinadn/erpnext.git --branch pre-prod
           bench get-app https://tinadn:${{secrets.GH_PAT}}@github.com/8848digital/ERPNext-India.git --branch pre-prod
           bench get-app https://github.com/8848digital/india_compliance.git --branch pre-prod
           bench get-app https://github.com/8848digital/Assets --branch pre-prod
@@ -106,8 +106,8 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           set +e  # Prevent script exit on failure
-          bench --site test_site run-tests --app erpnext --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
-          # bench --site test_site run-tests --module erpnext.accounts.report.cheques_and_deposits_incorrectly_cleared.test_cheques_and_deposits_incorrectly_cleared
+          # bench --site test_site run-tests --app erpnext --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
+          bench --site test_site run-tests --module erpnext.accounts.report.cheques_and_deposits_incorrectly_cleared.test_cheques_and_deposits_incorrectly_cleared --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
           echo "Tests completed, proceeding with next steps..."
         env:
           TYPE: server
