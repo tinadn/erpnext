@@ -106,9 +106,9 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           set +e  # Prevent script exit on failure
-          # bench --site test_site run-tests --app erpnext --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
-          bench --site test_site run-tests --module erpnext.accounts.report.cheques_and_deposits_incorrectly_cleared.test_cheques_and_deposits_incorrectly_cleared --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
-          bench --site test_site run-tests --module erpnext.accounts.report.consolidated_financial_statement.test_consolidated_financial_statement --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
+          bench --site test_site run-tests --app erpnext --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
+          # bench --site test_site run-tests --module erpnext.accounts.report.cheques_and_deposits_incorrectly_cleared.test_cheques_and_deposits_incorrectly_cleared --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
+          # bench --site test_site run-tests --module erpnext.accounts.report.consolidated_financial_statement.test_consolidated_financial_statement --coverage --junit-xml-output /home/runner/frappe-bench/test_results.xml 2>&1 | tee test_output.log
           echo "Tests completed, proceeding with next steps..."
         env:
           TYPE: server
