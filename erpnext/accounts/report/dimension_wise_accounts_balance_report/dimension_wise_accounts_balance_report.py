@@ -115,6 +115,7 @@ def set_gl_entries_by_account(dimension_list, filters, account, gl_entries_by_ac
 		gl_entries_by_account.setdefault(entry.account, []).append(entry)
 
 
+
 def format_gl_entries(gl_entries_by_account, accounts_by_name, dimension_list, dimension_type):
 	for entries in gl_entries_by_account.values():
 		for entry in entries:
